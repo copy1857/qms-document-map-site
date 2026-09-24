@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>品質文件架構圖</title>
+<meta name="description" content="長庚醫學科技品質管理系統文件：一階品質手冊、二階程序書、三階作業指導書與紀錄表單的從屬關係圖">
+<link rel="icon" href="assets/cgm-logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="scroll-progress" id="scrollProgress"></div>
+
+<header class="top">
+  <a class="brand" href="#" id="brandHome" title="回新人導覽"><img class="brand-logo" src="assets/cgm-logo-white.png" alt="CGM 長庚醫學科技"><span class="brand-div"></span><span class="brand-t"><b>品質文件架構圖</b><small>長庚醫學科技股份有限公司・品質管理系統</small></span></a>
+  <div class="counts" id="counts"></div>
+  <div class="spacer"></div>
+  <span class="live" id="live" title="連線狀態"><span class="dot"></span><span id="liveText">載入中</span></span>
+  <label class="btn small ripple-host" id="uploadBtn" title="加入 PDF／Word／壓縮檔，會自動重新解析">＋ 加入文件<input type="file" id="fileInput" multiple accept=".pdf,.docx,.rar,.zip,.7z" hidden></label>
+  <div class="search">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="搜尋編號或名稱，例如 CP─08、訓練" autocomplete="off">
+    <div class="results" id="results"></div>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-view="guide" class="active">① 新人導覽</button>
+  <button data-view="mindmap">② 架構心智圖</button>
+  <button data-view="org">③ 組織架構</button>
+  <button data-view="procs">④ 程序書一覽</button>
+  <button data-view="all">⑤ 全部文件</button>
+  <button data-view="issues">⑥ 一致性檢查 <span class="badge" id="issueBadge">0</span></button>
+  <button data-view="iso">⑦ ISO 對照</button>
+  <button data-view="changes">⑧ 異動紀錄 <span class="badge" id="changeBadge">0</span></button>
+</nav>
+
+<main id="main">
+  <!-- ① 新人導覽 -->
+  <section class="view active" id="view-guide">
+    <div class="med-hero reveal" id="medHero">
+      <img class="med-logo" src="assets/cgm-logo-white.png" alt="" aria-hidden="true">
+      <div class="med-deco" aria-hidden="true"><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span></div>
+      <div class="med-head">
+        <div class="med-eyebrow"><span class="med-pulse"></span>CGM 長庚醫學科技・品質管理系統　新人導覽</div>
+        <h1>品質文件是一座<span>四層金字塔</span></h1>
+        <p class="med-lead">越上層越重要、決定方向；越下層數量越多、越貼近實際工作。<b>上層規定下層，下層依照上層</b>。每一張紀錄表單，最後都能往上追到它依據的程序書，再追到品質手冊。</p>
+        <div class="med-kpis" id="medKpis"></div>
+        <svg class="med-ecg" viewBox="0 0 1200 60" preserveAspectRatio="none" aria-hidden="true"><path class="ecg-base" d="M0,30 L120,30 L134,23 L146,30 L160,30 L168,6 L177,54 L185,30 L206,30 L222,20 L242,30 L300,30 L420,30 L434,23 L446,30 L460,30 L468,6 L477,54 L485,30 L506,30 L522,20 L542,30 L600,30 L720,30 L734,23 L746,30 L760,30 L768,6 L777,54 L785,30 L806,30 L822,20 L842,30 L900,30 L1020,30 L1034,23 L1046,30 L1060,30 L1068,6 L1077,54 L1085,30 L1106,30 L1122,20 L1142,30 L1200,30"/><path class="ecg-run" pathLength="1000" d="M0,30 L120,30 L134,23 L146,30 L160,30 L168,6 L177,54 L185,30 L206,30 L222,20 L242,30 L300,30 L420,30 L434,23 L446,30 L460,30 L468,6 L477,54 L485,30 L506,30 L522,20 L542,30 L600,30 L720,30 L734,23 L746,30 L760,30 L768,6 L777,54 L785,30 L806,30 L822,20 L842,30 L900,30 L1020,30 L1034,23 L1046,30 L1060,30 L1068,6 L1077,54 L1085,30 L1106,30 L1122,20 L1142,30 L1200,30"/></svg>
+      </div>
+      <div class="pyr-stage" id="pyrStage">
+        <div class="pyr-left">
+          <div class="pyr-tilt" id="pyrTilt">
+            <svg class="pyramid" id="pyramid" viewBox="0 0 600 450" role="group" aria-label="四層文件金字塔：滑過或點選任一層，方向鍵可切換"></svg>
+          </div>
+          <div class="pyr-hint">滑過或點選任一層 · 鍵盤 ↑↓ 切換</div>
+        </div>
+        <div class="pyr-right">
+          <div class="pyr-steps" id="pyrSteps" aria-label="文件層級"></div>
+          <div class="pyr-auto"><button class="btn small ripple-host" id="pyrAuto"></button><div class="pyr-prog"><i id="pyrProg"></i></div></div>
+          <div class="pyr-inspect" id="pyrInspect" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="rule-note med-note">📘 依據《文件管制程序》（CP─01）5.6.1 條：一階＝品質手冊；二階＝程序書；三階＝作業指導書、規範、規章、手冊等；四階＝紀錄（表單）。點任何一層可以看該層的所有文件。</div>
+    </div>
+
+    <div class="grid2">
+      <div class="card reveal reveal-left">
+        <h3>🚶 實例走一遍：一張表單從哪裡來？</h3>
+        <p class="help">選一份程序書，看它如何從品質手冊一路往下，最後產生紀錄。</p>
+        <div class="walk-controls">
+          <select id="walkSelect"></select>
+          <button class="btn small ripple-host" id="walkPlay">▶ 重新播放</button>
+        </div>
+        <div class="walk" id="walk"></div>
+      </div>
+      <div class="card reveal reveal-right" style="--d:120ms">
+        <h3>🔎 看懂文件編號</h3>
+        <p class="help">每一份文件的編號都藏著它的層級與上層文件。輸入或點選範例：</p>
+        <div class="decoder">
+          <input id="decInput" value="CP─08─01" spellcheck="false">
+          <div class="examples" id="decExamples"></div>
+          <div class="dec-parts" id="decParts"></div>
+          <div class="dec-result" id="decResult"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card reveal" style="margin-top:20px">
+      <h3>🏢 我是哪個部門？看看我們負責制定的程序書</h3>
+      <div class="filters" id="deptChips"></div>
+      <div class="cp-grid" id="deptCps"></div>
+    </div>
+
+    <div class="card reveal" style="margin-top:20px">
+      <h3>📌 新人三件事</h3>
+      <ol style="margin:0;padding-left:22px">
+        <li><b>先找程序書</b>：到「④ 程序書一覽」依 ISO 13485 章節或 QMS 條號找到與你工作相關的程序書，看「目的」就知道它管什麼。</li>
+        <li><b>再看要填哪些表</b>：點開程序書，下方列出它的<span class="tag lv4">紀錄表單</span>與保存期限。</li>
+        <li><b>需要操作細節時</b>：看它引用的<span class="tag lv3">三階文件</span>（作業指導書、規範）。</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ② 心智圖 -->
+  <section class="view" id="view-mindmap">
+    <div class="mm-shell tech" id="mmShell">
+      <div class="mm-toolbar">
+        <div class="group">
+          <button class="btn small ripple-host" data-mm="l2">只看程序書</button>
+          <button class="btn small ripple-host" data-mm="l3">展開每份程序書</button>
+          <button class="btn small ripple-host" data-mm="all">全部展開</button>
+          <button class="btn small ripple-host" data-mm="collapse">全部收合</button>
+        </div>
+        <div class="group">
+          <button class="btn small ripple-host" data-mm="fit">⤢ 置中</button>
+          <button class="btn small ripple-host" data-mm="zin">＋</button>
+          <button class="btn small ripple-host" data-mm="zout">－</button>
+        </div>
+        <div class="mm-focus" id="mmFocus"></div>
+        <div class="group">
+          <label class="btn small"><input type="checkbox" id="mmForms" checked> 顯示紀錄</label>
+          <label class="btn small"><input type="checkbox" id="mmShared"> 共用三階重複顯示</label>
+        </div>
+      </div>
+      <svg class="mindmap" id="mindmap"><g class="viewport" id="mmViewport"><g id="mmLinks"></g><g id="mmNodes"></g></g></svg>
+      <div class="mm-wm" aria-hidden="true"></div>
+      <div class="mm-legend" id="mmLegend"></div>
+      <div class="mm-tip" id="mmTip" role="tooltip"></div>
+      <div class="mm-hint">點方塊：展開／收合並看說明　拖曳：移動　滾輪：縮放</div>
+    </div>
+  </section>
+
+  <!-- ③ 組織架構 -->
+  <section class="view" id="view-org">
+    <div class="procs-head">
+      <h2>組織架構</h2>
+      <div class="org-tools">
+        <button class="btn small ripple-host" id="orgReplay">▶ 重播動畫</button>
+        <label class="btn small"><input type="checkbox" id="orgHeat"> 依負責文件數著色</label>
+      </div>
+    </div>
+    <p class="lead">依《品質管理系統與組織責任規劃程序》（CP─28）6.2.1 圖1 繪製。滑過任一單位會點亮它往上到董事長的路徑；點一下看該單位的職責、負責制定的程序書與三階文件。</p>
+    <div class="org-wrap tech"><div class="org-scan"></div><div class="org-scroll"><svg class="org-chart" id="orgChart" role="group" aria-label="公司組織架構圖"></svg></div></div>
+    <div class="org-legend">
+      <span class="lvt lv1">最高管理</span><span class="lvt lv3">品質系統管理代表</span><span class="lvt lv2">總經理室及所屬</span><span class="lvt lv4">各處</span>
+      <span class="muted">右上角數字＝下轄單位數；左上角 ↗＝到心智圖看此單位的文件；方塊底部＝負責制定的程序書／三階文件／紀錄數</span>
+    </div>
+    <div class="org-note" id="orgNote"></div>
+  </section>
+
+  <!-- ④ 程序書一覽 -->
+  <section class="view" id="view-procs">
+    <div class="procs-head">
+      <h2 class="reveal" id="procTitle">程序書一覽</h2>
+      <div class="seg" id="procMode" role="tablist" aria-label="排列方式">
+        <button data-mode="iso" class="ripple-host" role="tab">依 ISO 13485 章節</button>
+        <button data-mode="qms" class="ripple-host" role="tab">依 QMS 條號</button>
+      </div>
+    </div>
+    <p class="lead reveal" id="procLead"></p>
+    <div class="proc-kpis" id="procKpis"></div>
+    <div class="proc-dept" id="procDept" aria-label="依制定單位篩選"></div>
+    <div id="chapters"></div>
+  </section>
+
+  <!-- ⑤ 全部文件 -->
+  <section class="view" id="view-all">
+    <h2>全部文件</h2>
+    <p class="lead">一階品質手冊到四階紀錄表單的完整清冊。點層級方塊篩選，點任一列看詳細說明與出處。</p>
+    <div class="all-tiles" id="allTiles"></div>
+    <div class="all-bar">
+      <label class="all-q"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="allQ" type="search" placeholder="篩選編號、名稱、部門或保存期限" autocomplete="off"></label>
+      <label class="all-tg"><input type="checkbox" id="allRet"><span>只看有保存期限</span></label>
+      <label class="all-tg"><input type="checkbox" id="allElec"><span>只看電子表單</span></label>
+      <label class="all-sort">排序<select id="allSort"><option value="code">依層級與編號</option><option value="eff">施行日（新→舊）</option><option value="cite">被引用（多→少）</option></select></label>
+      <span class="all-count" id="allCount"></span>
+    </div>
+    <div class="all-table-wrap">
+    <table class="list all" id="allTable">
+      <colgroup><col style="width:78px"><col style="width:150px"><col><col style="width:190px"><col style="width:78px"><col style="width:118px"><col style="width:118px"><col style="width:110px"></colgroup>
+      <thead><tr><th>層級</th><th>編號</th><th>名稱</th><th>上層文件</th><th class="nw">版次</th><th class="nw">施行日</th><th class="nw">保存期限</th><th class="nw">被引用</th></tr></thead><tbody></tbody></table>
+    </div>
+  </section>
+
+  <!-- ⑥ 檢查 -->
+  <section class="view" id="view-issues">
+    <h2>一致性檢查</h2>
+    <p class="lead">自動比對附錄清單、本文引用、相關文件、保存期限表、修訂紀錄與品質手冊對照表。每一項都附原文出處與建議作法，供文件管制人員覆核。</p>
+    <div class="issue-kpis" id="issueKpis"></div>
+    <h3 class="is-sub">檢查項目</h3>
+    <div class="issue-summary" id="issueSummary"></div>
+    <div class="issue-bar">
+      <label class="all-q"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="issueQ" type="search" placeholder="搜尋文件編號或關鍵字，例如 CP─26、電腦系統" autocomplete="off"></label>
+      <span class="all-count" id="issueCount"></span>
+    </div>
+    <div class="issue-list" id="issueList"></div>
+  </section>
+
+  <!-- ⑦ ISO -->
+  <section class="view" id="view-iso">
+    <h2>ISO 13485 條文 ↔ 公司文件</h2>
+    <p class="lead">取自《品質手冊》（QS─01）附錄A。這張表就是「一階 → 二階」的連結：品質手冊的每個條文，由哪幾份程序書落實。</p>
+    <table class="list iso" id="isoTable"><thead><tr><th style="width:36%">ISO 13485 條文</th><th style="width:14%">QMS 條號</th><th>公司文件</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <!-- ⑧ 異動 -->
+  <section class="view" id="view-changes">
+    <h2>異動紀錄</h2>
+    <p class="lead">每次在 <code>source/</code> 新增、替換或刪除文件後自動重新解析，差異會記在這裡，心智圖上也會用<b style="color:var(--ok)">綠色</b>（新增）、<b style="color:var(--warn)">橘色</b>（變更）、<b style="color:var(--bad)">紅色虛線</b>（刪除）標示。</p>
+    <div class="timeline" id="timeline"></div>
+  </section>
+</main>
+
+<footer class="prov" id="prov"></footer>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-head" id="drawerHead"></div>
+  <div class="drawer-body" id="drawerBody"></div>
+</aside>
+
+<div class="toast-stack" id="toasts"></div>
+<div class="dropzone" id="dropzone"><div>放開即可加入文件<small>PDF、Word（.docx）或 .rar／.zip，會自動重新解析</small></div></div>
+<button class="to-top" id="toTop" title="回到頂端">↑</button>
+
+<script src="data/graph.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
