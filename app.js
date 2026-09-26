@@ -834,13 +834,20 @@
   // ------------------------------------------------------------ ⑦ 異動紀錄
   function renderChanges() {
     const ch = G.changes || [];
-    const pill = (x, cls) => `<span class="pill ${cls}" data-key="${esc(x.key)}" title="${esc(x.name || '')}">${esc(x.code)} ${esc((x.name || '').slice(0, 16))}</span>`;
-    $('#timeline').innerHTML = ch.map(c => `<div class="tl-item reveal"><h4>${esc(c.at.replace('T', ' '))}　<span class="muted">第 ${c.revision} 版資料</span></h4>
-      ${c.added.length ? `<div class="tl-row"><b style="color:var(--ok)">新增 ${c.added.length}</b>${c.added.map(x => pill(x, 'add')).join('')}</div>` : ''}
-      ${c.removed.length ? `<div class="tl-row"><b style="color:var(--bad)">刪除 ${c.removed.length}</b>${c.removed.map(x => pill(x, 'del')).join('')}</div>` : ''}
-      ${c.changed.length ? `<div class="tl-row"><b style="color:var(--warn)">變更 ${c.changed.length}</b>${c.changed.map(x => pill(x, 'chg') + `<span class="muted" style="font-size:12px">${esc(Object.entries(x.fields).map(([f, [a, b]]) => `${fieldName(f)}：${fmtVal(a)} → ${fmtVal(b)}`).join('；'))}</span>`).join('')}</div>` : ''}
-    </div>`).join('') || '<div class="empty">尚無異動。之後把新版程序書放進 <code>source/</code> 資料夾（或用右上角「＋ 加入文件」），這裡會自動記錄。</div>';
-    $$('#timeline .pill:not(.del)').forEach(p => p.onclick = () => N.has(p.dataset.key) && openDetail(p.dataset.key));
+    // 每次重新解析一張卡：日期、資料版次、數量摘要；每份文件一列，變更欄位以「舊 → 新」列出
+    const KIND = { add: '新增', del: '刪除', chg: '變更' };
+    const doc = (x, k) => {
+      const n = N.get(x.key);
+      const f = k === 'chg' ? Object.entries(x.fields || {}).map(([f, [a, b]]) => `<span class="tl-fc"><i>${esc(fieldName(f))}</i><s>${esc(fmtVal(a))}</s><em>→</em><b>${esc(fmtVal(b))}</b></span>`).join('') : '';
+      return `<div class="tl-doc ${k}${k !== 'del' && n ? ' go' : ''}" data-key="${esc(x.key)}"><div class="tl-dh"><span class="tl-k">${KIND[k]}</span>${n ? lvTag(n.level) : ''}<b class="code">${esc(x.code)}</b><span class="tl-nm">${esc(x.name || '')}</span></div>${f ? `<div class="tl-fs">${f}</div>` : ''}</div>`;
+    };
+    $('#timeline').innerHTML = ch.map(c => {
+      const [d, t] = c.at.split('T');
+      const sum = [['add', c.added.length], ['del', c.removed.length], ['chg', c.changed.length]].filter(([, k]) => k).map(([k, v]) => `<span class="tl-s ${k}">${KIND[k]} ${v}</span>`).join('');
+      return `<div class="tl-item reveal"><div class="tl-head"><span class="tl-date">${esc(d)}</span><span class="tl-time">${esc((t || '').slice(0, 5))}</span><span class="tl-rev">第 ${c.revision} 版資料</span><span class="tl-sum">${sum || '<span class="tl-s">無差異</span>'}</span></div>
+        <div class="tl-list">${c.added.map(x => doc(x, 'add')).join('')}${c.removed.map(x => doc(x, 'del')).join('')}${c.changed.map(x => doc(x, 'chg')).join('')}</div></div>`;
+    }).join('') || (PUBLISH ? '<div class="empty">目前沒有異動紀錄。</div>' : '<div class="empty">尚無異動。之後把新版程序書放進 <code>source/</code> 資料夾（或用右上角「＋ 加入文件」），這裡會自動記錄。</div>');
+    $$('#timeline .tl-doc.go').forEach(el => el.onclick = () => openDetail(el.dataset.key));
     observeReveals($('#timeline'));
   }
   const fieldName = f => ({ name: '名稱', version: '版次', effective: '施行日', effective_ym: '表單施行', parents: '上層', status: '狀態' }[f] || f);
@@ -2037,6 +2044,7 @@
     if (PUBLISH) {
       // 隱藏一致性檢查分頁、上傳按鈕，分頁重新編號
       $('#tabs button[data-view="issues"]')?.remove();
+      const cl = $('#view-changes .lead'); if (cl) cl.textContent = '內部版每次重新解析文件時記錄的差異：新增、刪除的文件，以及名稱、版次、施行日等欄位的變更（舊 → 新）。點文件可看詳細資料。';
       $('#view-issues')?.remove();
       $('#uploadBtn')?.remove();
       const nums = '①②③④⑤⑥⑦⑧⑨';
