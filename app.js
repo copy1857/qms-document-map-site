@@ -956,13 +956,20 @@
       flush();
       return html;
     };
-    function qsBlock(c) {
+    function qsBlock(c, qmsMode) {
       const t = G.qs_text?.[c];
       if (!t) return '';
       // ISO 沒有標題的條文（4.1.1～4.1.6），解析時第一行會被當成標題，接回本文
       const text = enTitle(c) === '' ? t.title + t.text : t.text;
-      return `<div class="cl-blk qs"><div class="cl-bh"><span class="cl-src-tag qs">品質手冊</span><b>QS─01 ${esc(c)}</b><span class="muted">第 ${t.page} 頁</span></div><div class="cl-txt">${readable(text)}</div></div>`;
+      const where = qmsMode ? `QS─01 ${esc(enTitle(c) === '' ? '' : t.title)}` : `QS─01 ${esc(c)}`;
+      return `<div class="cl-blk qs"><div class="cl-bh"><span class="cl-src-tag qs">品質手冊</span><b>${where}</b><span class="muted">第 ${t.page} 頁</span></div><div class="cl-txt">${readable(text)}</div></div>`;
     }
+    // 準則條文沒有標題：取第一句當摘要
+    const artGist = a => {
+      if (!a) return '';
+      const first = a.text.split('\n')[0].replace(/^製造業者(應|之)?/, '').split(/[。；：]/)[0];
+      return first.length > 34 ? first.slice(0, 34) + '…' : first;
+    };
     function lawBlock(no) {
       const a = refs().qms?.articles?.[no];
       if (!a) return `<div class="cl-blk law"><div class="cl-bh"><span class="cl-src-tag law">QMS 準則</span><b>第 ${no} 條</b></div><div class="cl-txt muted">尚未下載準則原文（執行 tools/fetch_refs.py）</div></div>`;
@@ -986,28 +993,32 @@
         for (const r of rs) for (const a of arts(r)) { if (!by.has(a)) by.set(a, []); by.get(a).push(r); }
         const list = [...by.entries()].sort((a, b) => a[0] - b[0]);
         return { n: list.length, html: list.map(([no, rr]) => {
-          const ch = refs().qms?.articles?.[no]?.chapter?.replace(/^第\s*\S+\s*章\s*/, '') || '';
+          const a = refs().qms?.articles?.[no];
+          const ch = a?.chapter?.replace(/\s+/g, '') || '';
           return `<div class="cl-it" data-art="${no}" data-cls="${esc(rr.map(r => r.clause).join(','))}">
-            <button class="cl-h" aria-expanded="false"><b class="cl-no">第 ${no} 條</b><span class="cl-t">${esc(rr.map(r => zhTitle(r.clause)).join('、'))}<small>${esc(ch)}</small></span><span class="cl-tag">ISO ${esc(rr.map(r => r.clause).join('、'))}</span>${chev}</button>
+            <button class="cl-h" aria-expanded="false"><b class="cl-no">第 ${no} 條</b><span class="cl-t">${esc(artGist(a))}<small>${esc(ch)}</small></span>${chev}</button>
             <div class="cl-b"><div class="cl-bi"></div></div></div>`;
         }).join('') };
       }
       return { n: rs.length, html: rs.map(r => `<div class="cl-it" data-cls="${esc(r.clause)}">
-          <button class="cl-h" aria-expanded="false"><b class="cl-no">${esc(r.clause)}</b><span class="cl-t">${esc(zhTitle(r.clause))}<small>${esc(enTitle(r.clause))}</small></span>${arts(r).length ? `<span class="cl-tag">QMS 第 ${arts(r).join('、')} 條</span>` : r.not_applicable ? '<span class="cl-tag na">不適用</span>' : ''}${chev}</button>
+          <button class="cl-h" aria-expanded="false"><b class="cl-no">${esc(r.clause)}</b><span class="cl-t">${esc(zhTitle(r.clause))}<small>${esc(enTitle(r.clause))}</small></span>${r.not_applicable ? '<span class="cl-tag na">不適用</span>' : ''}${chev}</button>
           <div class="cl-b"><div class="cl-bi"></div></div></div>`).join('') };
     }
     function detail(key, it) {
       const cls = it.dataset.cls.split(',');
       const rs = cls.map(c => (G.iso_map || []).find(r => r.clause === c)).filter(Boolean);
-      if (it.dataset.art) return lawBlock(it.dataset.art) + cls.map(c => isoBlock(c) + qsBlock(c)).join('') + docsBlock(key, rs);
-      return arts(rs[0]).map(lawBlock).join('') + isoBlock(cls[0]) + qsBlock(cls[0]) + docsBlock(key, rs);
+      if (it.dataset.art) return lawBlock(it.dataset.art) + cls.map(c => qsBlock(c, true)).join('') + docsBlock(key, rs);
+      return isoBlock(cls[0]) + qsBlock(cls[0]) + docsBlock(key, rs);
     }
     const title = n => procMode === 'qms' ? `對應 QMS 準則條文（${n}）` : `對應 ISO 13485:2016 條文（${n}）`;
+    const hint = () => procMode === 'qms'
+      ? '點條文展開：《醫療器材品質管理系統準則》條文原文、品質手冊對應內容與同條文負責文件。'
+      : '點條文展開：ISO 13485:2016 條文標題、品質手冊對應內容與同條文負責文件。';
     function srcNote() {
       const q = refs().qms, i = refs().iso;
       const lines = [];
-      if (q) lines.push(`QMS：《${esc(q.name)}》${esc(q.issued || '')}發布${q.amended ? `，${esc(q.amended)}修正` : '，未曾修正'}（<a href="${esc(q.provenance?.url || '')}" target="_blank" rel="noopener">全國法規資料庫</a>，${esc((q.provenance?.checked_at || '').slice(0, 10))} 查核為最新版）`);
-      if (i) lines.push(`ISO：ISO 13485:2016 第 3 版（<a href="${esc(i.provenance?.status_url || '')}" target="_blank" rel="noopener">iso.org</a> 標示 2025 年複審確認為現行版，${esc(i.provenance?.status_checked_at || '')} 查核）`);
+      if (q && procMode === 'qms') lines.push(`QMS：《${esc(q.name)}》${esc(q.issued || '')}發布${q.amended ? `，${esc(q.amended)}修正` : '，未曾修正'}（<a href="${esc(q.provenance?.url || '')}" target="_blank" rel="noopener">全國法規資料庫</a>，${esc((q.provenance?.checked_at || '').slice(0, 10))} 查核為最新版）`);
+      if (i && procMode !== 'qms') lines.push(`ISO：ISO 13485:2016 第 3 版（<a href="${esc(i.provenance?.status_url || '')}" target="_blank" rel="noopener">iso.org</a> 標示 2025 年複審確認為現行版，${esc(i.provenance?.status_checked_at || '')} 查核）`);
       lines.push(`對照關係：品質手冊 QS─01 附錄A${G.qs_text && Object.keys(G.qs_text).length ? '；手冊內容：QS─01 同條號段落' : ''}`);
       return `<div class="cl-foot">${lines.join('<br>')}</div>`;
     }
@@ -1015,7 +1026,7 @@
       const { n, html } = items(key);
       return `<h4 data-fold="對應條文" class="cl-head">⬆ ${title(n)}</h4><div class="cl-sec" data-key="${esc(key)}">
         <div class="seg cl-mode" role="tablist"><button data-m="iso">依 ISO 13485 章節</button><button data-m="qms">依 QMS 條號</button></div>
-        <p class="cl-hint">點條文展開：QMS 準則原文、ISO 條文標題、品質手冊對應內容與同條文負責文件。</p>
+        <p class="cl-hint">${hint()}</p>
         <div class="cl-list">${html}</div>${srcNote()}</div>`;
     }
     function bind(body) {
@@ -1040,6 +1051,8 @@
       const t = h && [...h.childNodes].find(x => x.nodeType === 3 && x.textContent.trim());
       if (t) t.textContent = title(n);
       $$('.cl-mode button', sec).forEach(b => b.classList.toggle('on', b.dataset.m === procMode));
+      $('.cl-hint', sec).textContent = hint();
+      $('.cl-foot', sec).outerHTML = srcNote();
     }
     return { rows, section, bind, refresh };
   })();
