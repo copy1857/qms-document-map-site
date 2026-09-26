@@ -1472,3 +1472,33 @@ nav.tabs::-webkit-scrollbar { display: none; }
   :root:not([data-theme="light"]) .xr-t, :root:not([data-theme="light"]) .xr-sh { color: #cfe6ff; }
   :root:not([data-theme="light"]) .xr-q mark { background: #6b5200; }
 }
+
+/* ---------- PDF 頁面檢視（引用位置、表單快照） ---------- */
+.xr-snap { padding: 0; font: inherit; cursor: pointer; text-align: left; }
+.xr-pgb { border: 1px solid #cfe3f7; background: #eef5fc; color: var(--cgm); font: inherit; font-size: 12px; padding: 2px 9px; border-radius: 999px; cursor: pointer; transition: background .2s, color .2s; }
+.xr-pgb:hover { background: var(--cgm); color: #fff; }
+.pv { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; background: rgba(3, 18, 42, .88); opacity: 0; pointer-events: none; transition: opacity .25s ease; }
+.pv.on { opacity: 1; pointer-events: auto; }
+body.pv-open { overflow: hidden; }
+.pv-bar { flex: none; display: flex; align-items: center; gap: 8px; padding: 10px 14px; color: #fff; background: linear-gradient(120deg, #0b4a8f, #1a63b3 60%, #2a7fcf); box-shadow: 0 6px 18px rgba(0, 0, 0, .3); }
+.pv-t { font-size: 14.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-sp { flex: 1; }
+.pv-bar .btn { flex: none; background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .35); color: #fff; }
+.pv-bar .btn:hover { background: rgba(255, 255, 255, .26); }
+.pv-bar .pv-pdf[hidden] { display: none; }
+.pv-scroll { flex: 1; overflow: auto; padding: 18px; -webkit-overflow-scrolling: touch; }
+.pv-page { position: relative; width: min(100%, 900px); margin: 0 auto; background: #fff; border-radius: 6px; box-shadow: 0 18px 40px rgba(0, 0, 0, .45); transform: scale(.97); transition: transform .3s cubic-bezier(.2, .8, .2, 1), width .25s ease; }
+.pv.on .pv-page { transform: none; }
+.pv.zoom .pv-page { width: max(200%, 1400px); }
+.pv-page img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.pv-hls i { position: absolute; border: 2.5px solid #ffb400; background: rgba(255, 214, 0, .28); border-radius: 4px; box-shadow: 0 0 0 3px rgba(255, 180, 0, .25); animation: pvPulse 1.6s ease-in-out 3; }
+@keyframes pvPulse { 50% { box-shadow: 0 0 0 7px rgba(255, 180, 0, .12); } }
+.pv-note { text-align: center; color: #cfe6ff; font-size: 12.5px; margin-top: 10px; }
+@media (max-width: 720px) {
+  .pv-bar { flex-wrap: wrap; padding: 8px 10px; }
+  .pv-t { flex: 1 1 100%; white-space: normal; font-size: 13.5px; }
+  .pv-sp { display: none; }
+  .pv-scroll { padding: 10px 6px; }
+  .pv.zoom .pv-page { width: 260%; }
+}
+html.lite .pv { background: rgb(3, 18, 42); }

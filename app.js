@@ -1090,14 +1090,17 @@
     for (const w of [t?.code, t && nm(t)].filter(x => x && x.length >= 2)) h = h.split(esc(w)).join(`<mark>${esc(w)}</mark>`);
     return h;
   }
-  function placesHtml(pl, target) {
-    return `<div class="xr-places">${pl.map(p => `<div class="xr-pl"><div class="xr-ph"><b class="xr-cl">${esc(p.clause)}</b><span class="xr-t">${esc(p.title || (p.chapter ? `（${p.chapter}）` : ''))}</span>${p.table ? `<span class="xr-tb">${esc(p.table)}</span>` : ''}<span class="xr-pg">第 ${p.page} 頁</span></div><div class="xr-q">${markTarget(p.quote, target)}</div></div>`).join('')}</div>`;
+  // 頁面檢視按鈕：頁面圖、標示框、標題與原始 PDF（內部版才有檔案路徑）
+  const pvAttrs = (img, hl, title, file, page) => `data-pv="${esc(img)}" data-hl="${esc(JSON.stringify(hl || []))}" data-title="${esc(title)}"${file ? ` data-pdf="../${esc(encodeURI(file))}#page=${page}"` : ''}`;
+  function placesHtml(pl, target, citerKey) {
+    const src = N.get(citerKey);
+    return `<div class="xr-places">${pl.map(p => `<div class="xr-pl"><div class="xr-ph"><b class="xr-cl">${esc(p.clause)}</b><span class="xr-t">${esc(p.title || (p.chapter ? `（${p.chapter}）` : ''))}</span>${p.table ? `<span class="xr-tb">${esc(p.table)}</span>` : ''}${p.img ? `<button class="xr-pg xr-pgb" ${pvAttrs(p.img, p.hl, `${src ? src.code + ' ' + nm(src) : ''}・${p.clause}・第 ${p.page} 頁`, src?.file, p.page)} title="看 PDF 第 ${p.page} 頁的引用位置">PDF 第 ${p.page} 頁 ↗</button>` : `<span class="xr-pg">第 ${p.page} 頁</span>`}</div><div class="xr-q">${markTarget(p.quote, target)}</div></div>`).join('')}</div>`;
   }
   function snapsHtml(f) {
     const sh = f.snapshots || [];
     if (!sh.length) return '<div class="xr-none">原文 PDF 未附此表單頁面（可能為電子表單或另行管理），無快照。</div>';
     const owner = N.get((PS.get(f.key) || [])[0]);
-    return `<div class="xr-snaps">${sh.map(x => `<a class="xr-snap" href="${DATA_BASE}${esc(x.src)}" target="_blank" rel="noopener" title="開新分頁看原尺寸"><img loading="lazy" src="${DATA_BASE}${esc(x.src)}" alt="${esc(f.code)} 快照（PDF 第 ${x.page} 頁）"><span>PDF 第 ${x.page} 頁 ↗</span></a>`).join('')}</div>
+    return `<div class="xr-snaps">${sh.map(x => `<button class="xr-snap" ${pvAttrs(x.src, [], `${f.code} ${nm(f)}・${owner ? owner.code + ' ' : ''}PDF 第 ${x.page} 頁`, owner?.file, x.page)} title="放大檢視"><img loading="lazy" src="${DATA_BASE}${esc(x.src)}" alt="${esc(f.code)} 快照（PDF 第 ${x.page} 頁）"><span>PDF 第 ${x.page} 頁 ↗</span></button>`).join('')}</div>
       <div class="xr-src">快照取自${owner ? ` ${esc(owner.code)} ${esc(nm(owner))}` : ''}原文 PDF 的表單頁（依頁尾表單編號判定）</div>`;
   }
   // 使用時機：優先取所屬程序書本文的規定，沒有再取其他文件
@@ -1109,7 +1112,7 @@
   function usageHtml(f, ownerKey) {
     const us = usageOf(f, ownerKey);
     if (!us.length) return '<div class="xr-none">程序書本文沒有提到這張表單的使用時機（只列在附錄清單）。</div>';
-    return us.map(c => `${us.length > 1 || c.key !== ownerKey ? `<div class="xr-by">${esc(N.get(c.key).code)} ${esc(nm(N.get(c.key)))} 規定</div>` : ''}${placesHtml(c.places, f)}`).join('');
+    return us.map(c => `${us.length > 1 || c.key !== ownerKey ? `<div class="xr-by">${esc(N.get(c.key).code)} ${esc(nm(N.get(c.key)))} 規定</div>` : ''}${placesHtml(c.places, f, c.key)}`).join('');
   }
   function xrRow(kind, k, of, meta) {
     const n = N.get(k); if (!n) return '';
@@ -1122,9 +1125,40 @@
         <div class="xr-go"><button class="btn small primary" data-go="${esc(k)}">開啟 ${esc(n.code)} 詳細資料 ›</button></div>`;
     }
     const t = N.get(of), c = (t?.cited_by || []).find(x => x.key === k);
-    const body = c?.places?.length ? placesHtml(c.places, t) : `<div class="xr-none">${esc(n.code)} 沒有在本文條文中引用，只在附錄或對照表出現 ${c?.count || 0} 次。</div>`;
+    const body = c?.places?.length ? placesHtml(c.places, t, k) : `<div class="xr-none">${esc(n.code)} 沒有在本文條文中引用，只在附錄或對照表出現 ${c?.count || 0} 次。</div>`;
     return `<div class="xr-sec"><div class="xr-sh">${esc(n.code)} 在這些地方引用 ${esc(t.code)}</div>${body}</div><div class="xr-go"><button class="btn small primary" data-go="${esc(k)}">開啟 ${esc(n.code)} ›</button></div>`;
   }
+  // 頁面檢視：全螢幕顯示 PDF 頁面圖，框出被引用的編號與名稱；內部版可開原始 PDF
+  const PV = (() => {
+    let el = null, zoom = false;
+    function ensure() {
+      if (el) return el;
+      document.body.insertAdjacentHTML('beforeend', `<div class="pv" id="pgView" role="dialog" aria-modal="true" aria-label="PDF 頁面">
+        <div class="pv-bar"><b class="pv-t"></b><span class="pv-sp"></span><a class="btn small pv-pdf" target="_blank" rel="noopener">原始 PDF ↗</a><button class="btn small pv-zoom">放大</button><button class="btn small pv-x" aria-label="關閉">✕</button></div>
+        <div class="pv-scroll"><div class="pv-page"><img alt=""><div class="pv-hls"></div></div><div class="pv-note"></div></div></div>`);
+      el = $('#pgView');
+      $('.pv-x', el).onclick = close;
+      $('.pv-zoom', el).onclick = () => { zoom = !zoom; el.classList.toggle('zoom', zoom); $('.pv-zoom', el).textContent = zoom ? '縮小' : '放大'; };
+      $('.pv-scroll', el).onclick = e => { if (e.target === e.currentTarget) close(); };
+      return el;
+    }
+    function open(b) {
+      const v = ensure(), hl = JSON.parse(b.dataset.hl || '[]');
+      zoom = false; v.classList.remove('zoom'); $('.pv-zoom', v).textContent = '放大';
+      $('.pv-t', v).textContent = b.dataset.title || '';
+      const pdf = $('.pv-pdf', v); pdf.hidden = !b.dataset.pdf; if (b.dataset.pdf) pdf.href = b.dataset.pdf;
+      $('.pv-hls', v).innerHTML = hl.map(([x0, y0, x1, y1]) => `<i style="left:${(x0 * 100 - .6).toFixed(2)}%;top:${(y0 * 100 - .5).toFixed(2)}%;width:${((x1 - x0) * 100 + 1.2).toFixed(2)}%;height:${((y1 - y0) * 100 + 1).toFixed(2)}%"></i>`).join('');
+      $('.pv-note', v).textContent = hl.length ? '黃框：本文件被引用的位置' : '';
+      const img = $('img', v);
+      img.onload = () => { const first = $('.pv-hls i', v); if (first) first.scrollIntoView({ block: 'center', inline: 'center' }); };
+      img.src = DATA_BASE + b.dataset.pv;
+      v.classList.add('on'); document.body.classList.add('pv-open');
+    }
+    function close() { el?.classList.remove('on'); document.body.classList.remove('pv-open'); }
+    document.addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (b) { e.preventDefault(); e.stopPropagation(); open(b); } });
+    return { open, close, isOpen: () => !!el?.classList.contains('on') };
+  })();
+
   function bindXr(root) {
     $$('.xr', root).forEach(el => {
       const h = $('.xr-h', el), bi = $('.cl-bi', el);
@@ -2151,7 +2185,7 @@
     $$('#tabs button').forEach(b => b.onclick = () => switchView(b.dataset.view));
     $('#brandHome').onclick = e => { e.preventDefault(); switchView('guide'); };
     $$('#procMode button').forEach(b => b.onclick = () => setProcMode(b.dataset.mode));
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (PV.isOpen()) PV.close(); else closeDetail(); } });
     $('#scrim').onclick = closeDetail;
     // 內容往下捲時，頁首收合成精簡列。
     // 防抖動：頁首縮小會讓內容區變高、捲動位置被拉回，若不加條件會在展開／收合之間來回閃爍。
