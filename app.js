@@ -4,6 +4,10 @@
   // ------------------------------------------------------------ 小工具
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  // 手機／觸控裝置：關閉毛玻璃、光暈濾鏡等耗記憶體的效果（iOS 上會讓整頁當掉）
+  const SMALL = () => matchMedia('(max-width: 720px)').matches;
+  const LITE = matchMedia('(max-width: 720px), (hover: none), (pointer: coarse)').matches;
+  if (LITE) document.documentElement.classList.add('lite');
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const SVGNS = 'http://www.w3.org/2000/svg';
   const svgEl = (tag, attrs = {}) => { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
@@ -102,7 +106,7 @@
     const APEX = { x: 300, y: 22 }, BASE_Y = 418, BASE_HW = 262;
     const hw = y => (y - APEX.y) / (BASE_Y - APEX.y) * BASE_HW;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let sel = 2, preview = null, auto = !reduce, timer = null, hovering = false, entered = false, leaveT = null;
+    let sel = 2, preview = null, auto = !reduce && !SMALL(), timer = null, hovering = false, entered = false, leaveT = null;
     const TOUR_MS = 3600;
 
     function facts(lv) {
@@ -142,6 +146,8 @@
     function build() {
       const svg = $('#pyramid');
       svg.innerHTML = '';
+      // 手機：裁掉兩側流向箭頭，讓金字塔與層名放大到看得清楚
+      svg.setAttribute('viewBox', SMALL() ? '66 14 468 424' : '0 0 600 450');
       const defs = svgEl('defs');
       let d = `<linearGradient id="pySheen" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".38"/><stop offset=".55" stop-color="#fff" stop-opacity="0"/></linearGradient>
         <filter id="pyBlur" x="-20%" y="-200%" width="140%" height="500%"><feGaussianBlur stdDeviation="8"/></filter>
@@ -607,7 +613,8 @@
     if (allFilter.sort === 'due') rows = [...rows].filter(n => n.register?.review_due).sort((a, b) => a.register.review_due.localeCompare(b.register.review_due));
     const maxCite = Math.max(1, ...G.nodes.map(n => (n.cited_by || []).length));
     $('#allCount').innerHTML = `顯示 <b>${rows.length}</b> / ${G.nodes.length} 筆`;
-    $('#allTable tbody').innerHTML = rows.slice(0, 800).map((n, r) => {
+    // 分批繪製：一次畫上千列會讓手機瀏覽器記憶體不足而整頁當掉，先畫一批、按「顯示更多」再接續
+    const rowHtml = (n, r) => {
       const p = (PS.get(n.key) || []).map(k => N.get(k)).filter(Boolean);
       const st = recent.added.has(n.key) ? ' is-added' : recent.changed.has(n.key) ? ' is-changed' : '';
       const sub = [n.level === 3 ? n.kind : null, n.register?.overdue ? `屆期 ${n.register.review_due}（已逾期）` : null, n.dept, n.electronic ? '電子表單' : null, n.appendix_label ? `${n.in_appendix_of} ${n.appendix_label}` : null, n.status !== 'file' && n.level <= 2 ? '未收錄原文' : null].filter(Boolean);
@@ -621,8 +628,24 @@
         <td class="nw num">${esc(n.effective || n.effective_ym || '') || '<span class="muted">—</span>'}</td>
         <td class="nw">${n.retention?.retention ? `<span class="ret">${esc(n.retention.retention)}</span>` : '<span class="muted">—</span>'}</td>
         <td class="nw">${c ? `<span class="cite"><i style="--w:${Math.max(8, c / maxCite * 100).toFixed(0)}%"></i><b>${c}</b></span>` : '<span class="muted">—</span>'}</td></tr>`;
-    }).join('') || `<tr><td colspan="8"><div class="all-empty"><svg viewBox="0 0 64 64" width="56" height="56"><circle cx="28" cy="28" r="16" fill="none" stroke="currentColor" stroke-width="4"/><path d="m40 40 12 12" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><path d="M20 28h5l2-5 3 10 3-8h3" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg><div>沒有符合條件的文件</div></div></td></tr>`;
-    $$('#allTable tbody tr[data-key]').forEach(tr => tr.onclick = () => openDetail(tr.dataset.key));
+    };
+    const tbody = $('#allTable tbody');
+    const PAGE = SMALL() ? 40 : 200;
+    let shown = 0;
+    const more = () => {
+      $('#allMore')?.remove();
+      const next = rows.slice(shown, shown + PAGE);
+      tbody.insertAdjacentHTML('beforeend', next.map((n, i) => rowHtml(n, i)).join(''));
+      shown += next.length;
+      if (shown < rows.length) {
+        tbody.insertAdjacentHTML('beforeend', `<tr id="allMore" class="all-more"><td colspan="8"><button class="btn primary ripple-host">顯示更多（已顯示 ${shown} / ${rows.length}，再 ${Math.min(PAGE, rows.length - shown)} 筆）</button></td></tr>`);
+        $('#allMore button').onclick = e => { e.stopPropagation(); more(); };
+      }
+    };
+    tbody.innerHTML = '';
+    if (rows.length) more();
+    else tbody.innerHTML = `<tr><td colspan="8"><div class="all-empty"><svg viewBox="0 0 64 64" width="56" height="56"><circle cx="28" cy="28" r="16" fill="none" stroke="currentColor" stroke-width="4"/><path d="m40 40 12 12" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><path d="M20 28h5l2-5 3 10 3-8h3" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg><div>沒有符合條件的文件</div></div></td></tr>`;
+    tbody.onclick = e => { const tr = e.target.closest('tr[data-key]'); if (tr) openDetail(tr.dataset.key); };
   }
 
   // ------------------------------------------------------------ ⑤ 檢查

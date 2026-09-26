@@ -1145,3 +1145,36 @@ header.top .live.pub .dot { background: #7fe3ff; box-shadow: 0 0 6px #7fe3ff; }
 .all-dept select { min-width: 190px; font-weight: 600; }
 .all-dept select.on { background: linear-gradient(135deg, #1a63b3, var(--cgm)); color: #fff; border-color: transparent; box-shadow: 0 4px 10px rgba(42, 127, 207, .35); }
 .all-dept select.on option { color: var(--ink); background: var(--panel); }
+
+/* 全部文件：分批顯示 */
+table.list.all tbody tr.all-more { animation: none; cursor: default; }
+table.list.all tbody tr.all-more:hover { background: none; }
+tr.all-more td { text-align: center; padding: 16px 10px; }
+/* 列進場動畫結束後不保留圖層（fill 改為 backwards），避免上百列各占一個合成圖層 */
+table.list.all tbody tr { animation-fill-mode: backwards; }
+
+/* ---------- 手機／觸控裝置輕量模式（html.lite）----------
+   iOS 的 WebKit 每個分頁記憶體上限低，毛玻璃（backdrop-filter）、固定背景、SVG 光暈濾鏡
+   疊在長頁面上會讓分頁當掉，出現「無法開啟此頁面」。視覺維持同樣配色，只拿掉這些昂貴效果。 */
+html.lite *, html.lite *::before, html.lite *::after { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+html.lite body, html.lite body.guide-mode { background: #1a63b3 linear-gradient(180deg, #0b4a8f 0, #1a63b3 720px) no-repeat; }
+html.lite body::before { display: none; }
+html.lite svg *, html.lite .brand-logo, html.lite .med-logo { filter: none !important; }
+html.lite nav.tabs { background: #0a3f82; }
+html.lite .scrim { background: rgba(4, 24, 56, .55); }
+html.lite .tech .mm-toolbar .group, html.lite .tech .mm-legend, html.lite .tech .mm-hint, html.lite .tech .mm-tip { background: rgba(10, 18, 42, .94); }
+html.lite table.list.all tbody tr { animation: none; }
+html.lite .pyr-tilt { will-change: auto; }
+
+/* 手機：金字塔層名放大、不自動輪播、非選取層不淡化縮小，一眼看得出是哪一層 */
+@media (max-width: 720px) {
+  svg.pyramid .py-flow { display: none; }
+  .py-t1 { font-size: 27px; letter-spacing: .02em; }
+  .py-layer.lv1 .py-t1 { font-size: 24px; }
+  .py-t2 { font-size: 19px; }
+  .entered .py-layer.is-dim, .med-hero .entered .py-layer.is-dim { opacity: .88; filter: none; }
+  .entered .py-layer.is-show .py-vis, .med-hero .entered .py-layer.is-show .py-vis { transform: none; filter: none; }
+  .entered .py-layer.is-show .py-face { stroke: #fff; stroke-width: 3; }
+  .pstep b { font-size: 16px; }
+  .pstep small { font-size: 12px; }
+}
