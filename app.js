@@ -1682,6 +1682,8 @@
   function switchView(v) {
     if (PUBLISH && v === 'issues') v = 'guide';
     $$('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.view === v));
+    // 窄螢幕分頁列可橫向捲動：把目前分頁捲到可見的中間位置
+    { const nav = $('#tabs'), on = $('#tabs button.active'); if (on && nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: on.offsetLeft - (nav.clientWidth - on.offsetWidth) / 2, behavior: 'smooth' }); }
     $$('section.view').forEach(s => s.classList.toggle('active', s.id === `view-${v}`));
     $('#main').classList.toggle('full', v === 'mindmap');
     document.body.classList.toggle('guide-mode', v === 'guide');
@@ -1729,13 +1731,13 @@
       if (!el || el.closest('svg')) return;
       const cs = getComputedStyle(el);
       if (cs.position === 'static') el.style.position = 'relative';
-      if (el.tagName !== 'TR') el.style.overflow = 'hidden';
+      // 不直接改按鈕的 overflow：在彈性排版（例如手機分頁列）中 overflow:hidden 會讓按鈕被壓縮到只剩編號，改用內層裁切容器
       const r = el.getBoundingClientRect(); const size = Math.max(r.width, r.height);
       const s = document.createElement('span');
       s.className = 'ripple';
       s.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`;
       if (el.tagName === 'TR') { el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
-      else { el.appendChild(s); setTimeout(() => s.remove(), 650); }
+      else { const clip = document.createElement('span'); clip.className = 'ripple-clip'; clip.appendChild(s); el.appendChild(clip); setTimeout(() => clip.remove(), 650); }
       el.classList.remove('press'); void el.offsetWidth; el.classList.add('press');
     });
     const fixTop = () => {

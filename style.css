@@ -1178,3 +1178,8 @@ html.lite .pyr-tilt { will-change: auto; }
   .pstep b { font-size: 16px; }
   .pstep small { font-size: 12px; }
 }
+
+/* 點擊漣漪的裁切容器（不改動按鈕本身的 overflow，避免彈性排版中按鈕被壓縮） */
+.ripple-clip { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+/* 分頁列按鈕一律不縮，窄螢幕以橫向捲動呈現 */
+nav.tabs button { flex: none; }
