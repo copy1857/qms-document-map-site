@@ -810,7 +810,7 @@
         const n = N.get(k); return n ? `<button class="chip lv${n.level} dchip ripple-host" data-key="${esc(k)}"><span class="code">${esc(n.code)}</span> ${esc(nm(n))}</button>` : '';
       }).join('');
       if (top) return `<tr class="top"><td><span class="code">${esc(r.clause)}</span> ${esc(r.title)}</td><td>${esc(r.qms)}</td><td>${docs}</td></tr>`;
-      return `<tr class="iso-row" data-c="${esc(r.clause)}" tabindex="0" aria-expanded="false"><td><span class="iso-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span><span class="code">${esc(r.clause)}</span> ${esc(r.title || (G.refs?.iso?.titles?.[r.clause] ?? ''))}</td><td>${esc(r.qms)}</td><td>${docs}</td></tr>`;
+      return `<tr class="iso-row" data-c="${esc(r.clause)}" tabindex="0" aria-expanded="false"><td><span class="iso-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span><span class="code">${esc(r.clause)}</span> ${esc(CL.zhTitle(r.clause))}</td><td data-l="QMS">${esc(r.qms)}</td><td>${docs}</td></tr>`;
     }).join('') || '<tr><td colspan="3" class="empty">尚未解析到品質手冊附錄A</td></tr>';
     $$('#isoTable .dchip').forEach(b => b.onclick = e => { e.stopPropagation(); openDetail(b.dataset.key); });
     // 點條文列展開：ISO 條號與英文標題、QMS 準則原文、品質手冊同條號內容
@@ -1071,7 +1071,7 @@
       $('.cl-hint', sec).textContent = hint();
       $('.cl-foot', sec).outerHTML = srcNote();
     }
-    return { rows, section, bind, refresh, isoBlock, lawBlock, qsBlock, arts };
+    return { rows, section, bind, refresh, isoBlock, lawBlock, qsBlock, arts, zhTitle };
   })();
 
   function readable(text) {

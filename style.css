@@ -1324,3 +1324,36 @@ nav.tabs button { flex: none; }
 /* 分頁列可橫向滑動但不顯示捲軸 */
 nav.tabs { scrollbar-width: none; }
 nav.tabs::-webkit-scrollbar { display: none; }
+
+/* ---------- 手機：ISO 對照改為卡片式 ----------
+   大章節改為 CGM 藍章節橫幅；每個條文一張卡（條號＋標題、QMS 條號膠囊、公司文件），點卡片在下方接續展開細項 */
+@media (max-width: 720px) {
+  #isoTable, #isoTable tbody { display: block; background: none; border: 0; border-radius: 0; overflow: visible; }
+  #isoTable thead { display: none; }
+  #isoTable tbody { display: flex; flex-direction: column; gap: 8px; }
+  #isoTable tr.top { display: block; margin-top: 12px; }
+  #isoTable tr.top:first-child { margin-top: 0; }
+  #isoTable tr.top td { display: none; }
+  #isoTable tr.top td:first-child { display: flex; align-items: baseline; gap: 8px; padding: 9px 14px; border: 0; border-radius: 12px; color: #fff; font-size: 15.5px; letter-spacing: .04em;
+    background: linear-gradient(135deg, #0b4a8f, #1a63b3 60%, var(--cgm)); box-shadow: 0 6px 14px rgba(11, 74, 143, .25); }
+  #isoTable tr.top .code { color: #fff; font-size: 17px; font-weight: 800; }
+  #isoTable tr.iso-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 12px 14px; border: 1px solid #d6e6f6; border-radius: 14px;
+    background: var(--panel) !important; box-shadow: inset 4px 0 0 var(--cgm), 0 4px 12px rgba(11, 74, 143, .08); }
+  #isoTable tr.iso-row:active { background: color-mix(in srgb, var(--cgm) 6%, var(--panel)) !important; }
+  #isoTable tr.iso-row td { display: block; padding: 0; border: 0; }
+  #isoTable tr.iso-row td:first-child { flex: 1 1 auto; min-width: 0; font-weight: 600; font-size: 15px; line-height: 1.45; }
+  #isoTable tr.iso-row td:first-child .code { color: var(--cgm-ink); font-weight: 800; margin-right: 4px; }
+  #isoTable tr.iso-row td:nth-child(2) { flex: none; font-size: 12px; padding: 2px 10px; border-radius: 999px; background: #eef5fc; border: 1px solid #d9e8f7; color: var(--cgm-ink); white-space: nowrap; }
+  #isoTable tr.iso-row td:nth-child(2)::before { content: attr(data-l) " "; font-weight: 700; color: var(--cgm); }
+  #isoTable tr.iso-row td:nth-child(2):empty { display: none; }
+  #isoTable tr.iso-row td:nth-child(3) { flex: 1 1 100%; }
+  #isoTable tr.iso-row td:nth-child(3):empty { display: none; }
+  #isoTable tr.iso-row.open { border-radius: 14px 14px 0 0; border-color: var(--cgm); border-bottom-color: transparent; }
+  #isoTable tr.iso-det { display: none; }
+  #isoTable tr.iso-det.open { display: block; margin-top: -8px; }
+  #isoTable tr.iso-det.open > td { display: block; padding: 0 12px 14px; border: 1px solid var(--cgm); border-top: 0; border-radius: 0 0 14px 14px; background: color-mix(in srgb, var(--cgm) 3%, var(--panel)); }
+}
+@media (max-width: 720px) and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) #isoTable tr.iso-row { border-color: #1d3b66; }
+  :root:not([data-theme="light"]) #isoTable tr.iso-row td:nth-child(2) { background: #0f2544; border-color: #1d3b66; color: #cfe6ff; }
+}
