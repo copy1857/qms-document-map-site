@@ -623,11 +623,11 @@
         <td>${lvTag(n.level)}</td>
         <td class="code nw"><b>${esc(n.code)}</b></td>
         <td><div class="an">${esc(nm(n))}</div>${sub.length ? `<div class="as">${sub.map(esc).join('・')}</div>` : ''}</td>
-        <td>${p.map(x => `<span class="pchip lv${x.level}">${esc(x.code)}</span>`).join('')}</td>
-        <td class="nw">${n.version ? `<span class="ver">V${esc(n.version)}</span>` : '<span class="muted">—</span>'}</td>
-        <td class="nw num">${esc(n.effective || n.effective_ym || '') || '<span class="muted">—</span>'}</td>
-        <td class="nw">${n.retention?.retention ? `<span class="ret">${esc(n.retention.retention)}</span>` : '<span class="muted">—</span>'}</td>
-        <td class="nw">${c ? `<span class="cite"><i style="--w:${Math.max(8, c / maxCite * 100).toFixed(0)}%"></i><b>${c}</b></span>` : '<span class="muted">—</span>'}</td></tr>`;
+        <td data-l="上層">${p.map(x => `<span class="pchip lv${x.level}">${esc(x.code)}</span>`).join('')}</td>
+        <td class="nw" data-l="版次">${n.version ? `<span class="ver">V${esc(n.version)}</span>` : '<span class="muted">—</span>'}</td>
+        <td class="nw num" data-l="施行">${esc(n.effective || n.effective_ym || '') || '<span class="muted">—</span>'}</td>
+        <td class="nw" data-l="保存">${n.retention?.retention ? `<span class="ret">${esc(n.retention.retention)}</span>` : '<span class="muted">—</span>'}</td>
+        <td class="nw" data-l="被引用">${c ? `<span class="cite"><i style="--w:${Math.max(8, c / maxCite * 100).toFixed(0)}%"></i><b>${c}</b></span>` : '<span class="muted">—</span>'}</td></tr>`;
     };
     const tbody = $('#allTable tbody');
     const PAGE = SMALL() ? 40 : 200;
