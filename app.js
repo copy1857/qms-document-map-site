@@ -1457,6 +1457,11 @@
       }
       const xs = [...pos.values()]; if (!xs.length) return;
       needFit = false;
+      if (SMALL()) {
+        const p = pos.get(rootId()) || xs[0];
+        view.k = 0.8; view.tx = 14 - p.x * 0.8; view.ty = r.height * 0.5 - p.y * 0.8;
+        return applyView();
+      }
       const minX = Math.min(...xs.map(p => p.x)), maxX = Math.max(...xs.map(p => p.x + W[p.depth] + 20));
       const minY = Math.min(...xs.map(p => p.y)) - 70, maxY = Math.max(...xs.map(p => p.y)) + 40;
       // 字要看得清楚：最小 0.55 倍；內容比畫面高時靠上對齊，往下拖曳即可
@@ -1471,6 +1476,23 @@
       const p = pos.get(id); const r = svg.getBoundingClientRect(); if (!p || !r.width) return;
       view.k = k; view.tx = r.width * 0.4 - (p.x + W[p.depth] / 2) * k; view.ty = r.height / 2 - p.y * k; applyView();
     }
+    function panLeft(id) {
+      const p = pos.get(id); const r = svg.getBoundingClientRect(); if (!p || !r.width) return;
+      view.k = Math.max(view.k, 0.8); view.tx = 14 - p.x * view.k; view.ty = r.height * 0.42 - p.y * view.k; applyView();
+    }
+    // 手機：點方塊不直接開全螢幕面板，改在底部顯示簡介卡，按「查看詳細說明」再開
+    function showSheet(key, id) {
+      const sh = $('#mmSheet'); if (!sh) return;
+      const n = N.get(key); if (!n) return;
+      const kids = (KIDS.get(key) || []).length;
+      sh.innerHTML = `<div class="ms-body">${tipHtml(key).replace(/<div class="tt-hint">[\s\S]*?<\/div>$/, '')}</div>
+        <div class="ms-act"><button class="btn primary small" data-a="open">查看詳細說明 ›</button>${kids ? `<span class="ms-hint">${expanded.has(id) ? '再點方塊可收合' : '再點方塊可展開'}</span>` : ''}<button class="btn small ms-x" data-a="x" aria-label="關閉">✕</button></div>`;
+      sh.classList.add('on'); $('#mmShell').classList.add('sheet-on');
+      $('#mmShell').style.setProperty('--sheet-h', `${sh.offsetHeight + 22}px`); // 縮放按鈕讓到簡介卡上方
+      $('[data-a="open"]', sh).onclick = () => openDetail(key);
+      $('[data-a="x"]', sh).onclick = hideSheet;
+    }
+    function hideSheet() { $('#mmSheet')?.classList.remove('on'); $('#mmShell').classList.remove('sheet-on'); }
     function burst(id) {
       const p = pos.get(id); if (!p) return;
       const c = svgEl('rect', { class: 'mm-burst', x: p.x - 4, y: p.y - H / 2 - 4, width: W[p.depth] + 8, height: H + 8, rx: 11 });
@@ -1549,8 +1571,15 @@
       svg.prepend(defs);
       vp.prepend(svgEl('rect', { class: 'mm-bg', x: -60000, y: -60000, width: 120000, height: 120000, fill: 'url(#mmDots)' }));
       const tip = $('#mmTip'), shell = $('#mmShell');
+      shell.insertAdjacentHTML('beforeend', '<div class="mm-sheet" id="mmSheet" role="dialog" aria-label="文件簡介"></div>');
+      if (SMALL()) {
+        const z = $('[data-mm="fit"]').parentElement; z.classList.add('mm-zoom'); shell.appendChild(z);
+        $('[data-mm="fit"]').textContent = '⤢';
+        const h = $('.mm-hint', shell); if (h) h.textContent = '點方塊展開・雙指縮放・拖曳移動';
+      }
       const placeTip = e => { const r = shell.getBoundingClientRect(); let x = e.clientX - r.left + 16, y = e.clientY - r.top + 18; if (x + 290 > r.width) x -= 310; if (y + 150 > r.height) y -= 170; tip.style.transform = `translate(${x}px,${y}px)`; };
       svg.addEventListener('pointerover', e => {
+        if (e.pointerType !== 'mouse') return;
         const g = e.target.closest('.mm-node');
         if (!g || svg.classList.contains('dragging')) return;
         if (hoverId !== g.dataset.id) { hoverId = g.dataset.id; markPath(); }
@@ -1563,27 +1592,60 @@
       });
       svg.addEventListener('pointermove', e => { if (tip.classList.contains('on')) placeTip(e); });
       // 拖曳／點擊
-      let drag = null;
+      let drag = null, pinch = null;
+      const pts = new Map();
       svg.addEventListener('pointerdown', e => {
+        pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        try { svg.setPointerCapture(e.pointerId); } catch (err) { /* 指標已失效時略過 */ }
+        if (pts.size === 2) { // 雙指縮放：以兩指中點為錨點
+          const [a, b] = [...pts.values()], r = svg.getBoundingClientRect();
+          pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, k: view.k, mx: (a.x + b.x) / 2 - r.left, my: (a.y + b.y) / 2 - r.top, tx: view.tx, ty: view.ty };
+          drag = null; svg.classList.add('dragging'); $('#mmTip').classList.remove('on');
+          return;
+        }
         drag = { x: e.clientX, y: e.clientY, tx: view.tx, ty: view.ty, moved: false, target: e.target.closest('.mm-node') };
-        svg.setPointerCapture(e.pointerId);
       });
       svg.addEventListener('pointermove', e => {
+        if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pinch && pts.size >= 2) {
+          const [a, b] = [...pts.values()], r = svg.getBoundingClientRect();
+          const k2 = Math.max(0.25, Math.min(2.5, pinch.k * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d));
+          const mx = (a.x + b.x) / 2 - r.left, my = (a.y + b.y) / 2 - r.top;
+          view.tx = mx - (pinch.mx - pinch.tx) * k2 / pinch.k; view.ty = my - (pinch.my - pinch.ty) * k2 / pinch.k; view.k = k2;
+          applyView(false);
+          return;
+        }
         if (!drag) return;
         const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
         if (!drag.moved && Math.hypot(dx, dy) > 4) { drag.moved = true; svg.classList.add('dragging'); $('#mmTip').classList.remove('on'); }
         if (drag.moved) { view.tx = drag.tx + dx; view.ty = drag.ty + dy; applyView(false); }
       });
-      svg.addEventListener('pointerup', () => {
+      const endPtr = e => {
+        pts.delete(e.pointerId);
+        if (pinch) { if (pts.size < 2) { pinch = null; drag = null; svg.classList.remove('dragging'); } return; }
+        return true;
+      };
+      svg.addEventListener('pointercancel', e => { endPtr(e); drag = null; svg.classList.remove('dragging'); });
+      svg.addEventListener('pointerup', e => {
+        if (!endPtr(e)) return;
+        const touch = e.pointerType !== 'mouse' || SMALL();
         if (drag && !drag.moved && drag.target) {
           const g = drag.target, id = g.dataset.id, key = g.dataset.key;
           g.classList.add('press'); setTimeout(() => g.classList.remove('press'), 300);
           burst(id);
           if (!id.endsWith('~ghost')) {
-            if (N.get(key) && (KIDS.get(key) || []).length) toggle(id);
-            openDetail(key);
+            const hasKids = N.get(key) && (KIDS.get(key) || []).length;
+            if (touch) {
+              sel = key;
+              if (hasKids) toggle(id); else render();
+              showSheet(key, id);
+              if (hasKids && expanded.has(id)) setTimeout(() => panLeft(id), 60);
+            } else {
+              if (hasKids) toggle(id);
+              openDetail(key);
+            }
           }
-        }
+        } else if (drag && !drag.moved && touch) hideSheet();
         drag = null; svg.classList.remove('dragging');
       });
       svg.addEventListener('wheel', e => {
@@ -1601,7 +1663,7 @@
         expanded = new Set(a === 'collapse' ? [] : [rootId()]);
         if (a === 'l3' || a === 'all') for (const k of KIDS.get(ROOT) || []) expanded.add(`${ROOT}>${k}`);
         if (a === 'all') { const walk = inst => { for (const c of childInst(inst)) { if ((KIDS.get(c.key) || []).length) { expanded.add(c.id); walk(c); } } }; walk({ id: ROOT, key: ROOT }); }
-        render(); setTimeout(fit, 80);
+        hideSheet(); render(); setTimeout(fit, 80);
       }));
       $('#mmForms').onchange = e => { opt.forms = e.target.checked; render(); };
       $('#mmShared').onchange = e => { opt.shared = e.target.checked; render(); };
@@ -1854,7 +1916,8 @@
     if (v === 'org') ORG.shown();
     if (v === 'all') renderAll();
     window.dispatchEvent(new Event('resize'));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (v === 'mindmap' && SMALL()) setTimeout(() => window.scrollTo({ top: $('#mmShell').getBoundingClientRect().top + scrollY - $('#tabs').offsetHeight, behavior: 'smooth' }), 60);
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
     observeReveals($(`#view-${v}`));
     try { localStorage.setItem('qms.view', v); } catch (e) { /* 無痕模式 */ }
   }
@@ -1907,7 +1970,7 @@
       const h = sticky ? $('header.top').offsetHeight : 0;
       const navSticky = getComputedStyle($('#tabs')).position === 'sticky';
       $('#tabs').style.top = navSticky ? `${h}px` : '';
-      $('#mmShell').style.height = sticky ? `calc(100vh - ${h + $('#tabs').offsetHeight}px)` : '75vh';
+      $('#mmShell').style.height = sticky ? `calc(100vh - ${h + $('#tabs').offsetHeight}px)` : SMALL() ? `${innerHeight - $('#tabs').offsetHeight}px` : '75vh';
       const navH = $('#tabs').getBoundingClientRect().height;
       $$('table.list th').forEach(th => th.style.top = navSticky ? `${h + navH}px` : '');
     };
