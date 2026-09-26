@@ -1081,6 +1081,64 @@
     return { rows, section, bind, refresh, isoBlock, lawBlock, qsBlock, arts, zhTitle };
   })();
 
+  // ------------------------------------------------------------ 可展開的關聯列：引用處原句、表單使用時機與快照
+  const DATA_BASE = (() => { const src = document.querySelector('script[src*="graph.js"]')?.getAttribute('src') || '../data/graph.js'; return src.replace(/graph\.js.*$/, ''); })();
+  const XR_CHEV = '<span class="xr-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>';
+  // 原句中標示被引用文件的編號與名稱
+  function markTarget(q, t) {
+    let h = esc(q);
+    for (const w of [t?.code, t && nm(t)].filter(x => x && x.length >= 2)) h = h.split(esc(w)).join(`<mark>${esc(w)}</mark>`);
+    return h;
+  }
+  function placesHtml(pl, target) {
+    return `<div class="xr-places">${pl.map(p => `<div class="xr-pl"><div class="xr-ph"><b class="xr-cl">${esc(p.clause)}</b><span class="xr-t">${esc(p.title || (p.chapter ? `（${p.chapter}）` : ''))}</span>${p.table ? `<span class="xr-tb">${esc(p.table)}</span>` : ''}<span class="xr-pg">第 ${p.page} 頁</span></div><div class="xr-q">${markTarget(p.quote, target)}</div></div>`).join('')}</div>`;
+  }
+  function snapsHtml(f) {
+    const sh = f.snapshots || [];
+    if (!sh.length) return '<div class="xr-none">原文 PDF 未附此表單頁面（可能為電子表單或另行管理），無快照。</div>';
+    const owner = N.get((PS.get(f.key) || [])[0]);
+    return `<div class="xr-snaps">${sh.map(x => `<a class="xr-snap" href="${DATA_BASE}${esc(x.src)}" target="_blank" rel="noopener" title="開新分頁看原尺寸"><img loading="lazy" src="${DATA_BASE}${esc(x.src)}" alt="${esc(f.code)} 快照（PDF 第 ${x.page} 頁）"><span>PDF 第 ${x.page} 頁 ↗</span></a>`).join('')}</div>
+      <div class="xr-src">快照取自${owner ? ` ${esc(owner.code)} ${esc(nm(owner))}` : ''}原文 PDF 的表單頁（依頁尾表單編號判定）</div>`;
+  }
+  // 使用時機：優先取所屬程序書本文的規定，沒有再取其他文件
+  function usageOf(f, ownerKey) {
+    const cb = (f.cited_by || []).filter(c => c.places?.length && N.has(c.key));
+    const own = cb.filter(c => c.key === ownerKey);
+    return own.length ? own : cb;
+  }
+  function usageHtml(f, ownerKey) {
+    const us = usageOf(f, ownerKey);
+    if (!us.length) return '<div class="xr-none">程序書本文沒有提到這張表單的使用時機（只列在附錄清單）。</div>';
+    return us.map(c => `${us.length > 1 || c.key !== ownerKey ? `<div class="xr-by">${esc(N.get(c.key).code)} ${esc(nm(N.get(c.key)))} 規定</div>` : ''}${placesHtml(c.places, f)}`).join('');
+  }
+  function xrRow(kind, k, of, meta) {
+    const n = N.get(k); if (!n) return '';
+    return `<div class="xr" data-x="${kind}" data-key="${esc(k)}" data-of="${esc(of)}"><div class="rel xr-h" data-key="${esc(k)}" role="button" tabindex="0" aria-expanded="false">${lvTag(n.level)}<span class="code">${esc(n.code)}</span><span>${esc(nm(n))}</span><span class="meta">${meta}</span>${XR_CHEV}</div><div class="cl-b"><div class="cl-bi"></div></div></div>`;
+  }
+  function xrBody(el) {
+    const k = el.dataset.key, of = el.dataset.of, n = N.get(k);
+    if (el.dataset.x === 'form') {
+      return `<div class="xr-sec"><div class="xr-sh">什麼時候使用</div>${usageHtml(n, of)}</div><div class="xr-sec"><div class="xr-sh">表單快照</div>${snapsHtml(n)}</div>
+        <div class="xr-go"><button class="btn small primary" data-go="${esc(k)}">開啟 ${esc(n.code)} 詳細資料 ›</button></div>`;
+    }
+    const t = N.get(of), c = (t?.cited_by || []).find(x => x.key === k);
+    const body = c?.places?.length ? placesHtml(c.places, t) : `<div class="xr-none">${esc(n.code)} 沒有在本文條文中引用，只在附錄或對照表出現 ${c?.count || 0} 次。</div>`;
+    return `<div class="xr-sec"><div class="xr-sh">${esc(n.code)} 在這些地方引用 ${esc(t.code)}</div>${body}</div><div class="xr-go"><button class="btn small primary" data-go="${esc(k)}">開啟 ${esc(n.code)} ›</button></div>`;
+  }
+  function bindXr(root) {
+    $$('.xr', root).forEach(el => {
+      const h = $('.xr-h', el), bi = $('.cl-bi', el);
+      const toggle = () => {
+        if (!bi.innerHTML) { bi.innerHTML = xrBody(el); $$('[data-go]', bi).forEach(b => b.onclick = e => { e.stopPropagation(); openDetail(b.dataset.go); }); }
+        holdFold();
+        const on = !el.classList.contains('open');
+        el.classList.toggle('open', on); h.setAttribute('aria-expanded', on);
+      };
+      h.onclick = toggle;
+      h.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
+    });
+  }
+
   function readable(text) {
     let t = String(text || '');
     if (!t.includes('\n')) { // 舊資料沒有段落資訊：在條列項目前、句末後自動換行
@@ -1184,6 +1242,10 @@
     if (facts.length) parts.push(`<h4>📄 基本資料</h4><div class="facts">${facts.map(([a, b]) => `<div class="fact${WIDE.includes(a) ? ' wide' : ''}"><span>${a}</span><b>${b}</b></div>`).join('')}</div>`);
 
     if (n.level <= 2 && CL.rows(key).length) parts.push(CL.section(key));
+    if (n.level === 4) {
+      parts.push(`<h4>🧭 什麼時候使用這張表單</h4>${usageHtml(n, (PS.get(key) || [])[0])}`);
+      parts.push(`<h4>📎 表單快照（${(n.snapshots || []).length}）</h4>${snapsHtml(n)}`);
+    }
     const ps = (PS.get(key) || []).filter(k => k !== ROOT || n.level === 2);
     if (ps.length && n.level > 1) {
       parts.push(`<h4>⬆ 上層文件</h4><div class="why">判定依據：${esc(n.parent_basis || (n.level === 2 ? '二階程序書隸屬品質手冊' : '—'))}</div><div class="rel-list">${ps.map(k => relRow(k)).join('')}</div>`);
@@ -1196,11 +1258,11 @@
       parts.push(`<h4>⬇ 三階文件（${k3.length}）</h4>` + order.filter(b => grp[b]).map(b =>
         `<div class="why">${esc(b)}（${grp[b].length}）</div><div class="rel-list">${grp[b].map(k => relRow(k, (PS.get(k) || []).length > 1 ? `共用 ${(PS.get(k) || []).length} 份` : '')).join('')}</div>`).join(''));
     }
-    if (k4.length) parts.push(`<h4>⬇ 紀錄表單（${k4.length}）</h4><div class="rel-list">${k4.map(k => { const f = N.get(k); return relRow(k, [f.retention?.retention ? `保存 ${esc(f.retention.retention)}` : '', f.electronic ? '電子' : ''].filter(Boolean).join('・')); }).join('')}</div>`);
+    if (k4.length) parts.push(`<h4>⬇ 紀錄表單（${k4.length}）</h4><div class="xr-hint">點表單展開：程序書規定什麼時候使用、表單快照</div><div class="rel-list">${k4.map(k => { const f = N.get(k); return xrRow('form', k, key, [f.retention?.retention ? `保存 ${esc(f.retention.retention)}` : '', f.electronic ? '電子' : ''].filter(Boolean).join('・')); }).join('')}</div>`);
     const noCode = (n.appendix || []).filter(a => !a.key);
     if (noCode.length) parts.push(`<h4>📎 其他附錄（非表單）</h4><div>${noCode.map(a => `<div style="font-size:14px">${esc(a.label)}：${esc(a.name)}</div>`).join('')}</div>`);
     const cb = (n.cited_by || []).filter(c => N.has(c.key));
-    if (cb.length) parts.push(`<h4>🔗 被哪些文件引用（${cb.length}）</h4><div class="rel-list">${cb.map(c => relRow(c.key, c.clauses?.length ? `第 ${esc(c.clauses.slice(0, 4).join('、'))} 條${c.clauses.length > 4 ? '…' : ''}` : `${c.count} 次`)).join('')}</div>`);
+    if (cb.length) parts.push(`<h4>🔗 被哪些文件引用（${cb.length}）</h4><div class="xr-hint">點文件展開：在哪一條、用什麼原句引用本文件</div><div class="rel-list">${cb.map(c => xrRow('cite', c.key, key, c.clauses?.length ? `第 ${esc(c.clauses.slice(0, 4).join('、'))} 條${c.clauses.length > 4 ? '…' : ''}` : `${c.count} 次`)).join('')}</div>`);
     const ci = (n.cites || []).filter(c => N.has(c.key) && N.get(c.key).level <= 3 && !kidsOf(key).includes(c.key));
     if (ci.length) parts.push(`<h4>↔ 本文引用的其他文件（${ci.length}）</h4><div class="rel-list">${ci.map(c => relRow(c.key)).join('')}</div>`);
     if (n.related_uncoded?.length) parts.push(`<h4>📚 相關文件（無編號／外部法規）</h4><div style="font-size:14px">${n.related_uncoded.map(esc).join('、')}</div>`);
@@ -1212,6 +1274,7 @@
     $('#drawerBody').innerHTML = parts.join('');
     $('#drawerBody').scrollTop = 0; $('#drawer').classList.remove('scrolled');
     $$('#drawerBody .rel').forEach(r => r.onclick = () => openDetail(r.dataset.key));
+    bindXr($('#drawerBody'));
     if ($('#drawerIssues')) bindIssues($('#drawerIssues'));
     $$('#drawerBody [data-org-unit]').forEach(b => b.onclick = () => { const uid = b.dataset.orgUnit; closeDetail(); switchView('org'); setTimeout(() => ORG.pick(uid), 200); });
     $('#showInMap').onclick = () => { closeDetail(); switchView('mindmap'); setTimeout(() => MM.focus(key), 60); };
