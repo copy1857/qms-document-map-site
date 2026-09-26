@@ -872,6 +872,7 @@
     }
     body.replaceChildren(frag);
     makeFoldable(body);
+    CL.bind(body);
     $('#scrim').classList.add('on');
   }
   // 折疊動畫進行中暫停頁首收合判斷，避免高度變化觸發閃爍
@@ -885,7 +886,7 @@
     const secs = $$('.dsec', body);
     secs.forEach((sec, i) => {
       const h = $('h4', sec); if (!h) return;
-      const key = foldKey(h);
+      const key = h.dataset.fold || foldKey(h);
       const inner = document.createElement('div'); inner.className = 'dsec-in';
       while (h.nextSibling) inner.appendChild(h.nextSibling);
       const wrap = document.createElement('div'); wrap.className = 'dsec-body'; wrap.appendChild(inner);
@@ -916,6 +917,133 @@
     }
   }
   // 文字易讀化：段落、條列、依據句分開呈現
+  function setProcMode(m) {
+    if (procMode === m) return;
+    procMode = m;
+    try { localStorage.setItem('qms.procMode', procMode); } catch (e) { /* 無痕模式 */ }
+    renderProcs();
+    CL.refresh();
+  }
+
+  // ------------------------------------------------------------ 對應條文（ISO 13485:2016／QMS 準則）
+  // 對照關係取自品質手冊 QS─01 附錄A；QMS 條文原文取自全國法規資料庫；ISO 只列條號與標題（標準本文受著作權保護）；
+  // 品質手冊內容取自 QS─01 同條號段落（公開版不含）。依「程序書一覽」的 ISO／QMS 切換顯示，點條文展開細項。
+  const CL = (() => {
+    const refs = () => G.refs || {};
+    const arts = r => (r.qms || '').match(/\d+/g)?.map(Number) || [];
+    const isoKey = c => c.split('.').map(x => x.padStart(3, '0')).join('.');
+    function rows(key) {
+      const all = (G.iso_map || []).filter(r => (r.docs || []).includes(key));
+      // 已列出子條文時，省略只有標題的上層條（例如 7.4 採購 → 7.4.1、7.4.2）
+      return all.filter(r => !all.some(x => x !== r && x.clause.startsWith(r.clause + '.')));
+    }
+    const zhTitle = c => {
+      const r = (G.iso_map || []).find(x => x.clause === c);
+      if (r?.title) return r.title;
+      const up = c.split('.').slice(0, -1).join('.');
+      return up ? `${zhTitle(up)}・第 ${c.split('.').pop()} 項` : '';
+    };
+    const enTitle = c => refs().iso?.titles?.[c] ?? '';
+    const lawHtml = t => {
+      const lines = String(t || '').split('\n').filter(Boolean);
+      let html = '', list = [];
+      const flush = () => { if (list.length) { html += `<ol class="rd-list law">${list.map(([m, x]) => `<li><span class="rd-m">${esc(m)}</span><span>${esc(x)}</span></li>`).join('')}</ol>`; list = []; } };
+      for (const l of lines) {
+        const m = l.match(/^([一二三四五六七八九十]+)、(.*)$/) || l.match(/^（([一二三四五六七八九十]+)）(.*)$/);
+        if (m) { list.push([m[1], m[2]]); continue; }
+        flush(); html += `<p class="rd-p">${esc(l)}</p>`;
+      }
+      flush();
+      return html;
+    };
+    function qsBlock(c) {
+      const t = G.qs_text?.[c];
+      if (!t) return '';
+      // ISO 沒有標題的條文（4.1.1～4.1.6），解析時第一行會被當成標題，接回本文
+      const text = enTitle(c) === '' ? t.title + t.text : t.text;
+      return `<div class="cl-blk qs"><div class="cl-bh"><span class="cl-src-tag qs">品質手冊</span><b>QS─01 ${esc(c)}</b><span class="muted">第 ${t.page} 頁</span></div><div class="cl-txt">${readable(text)}</div></div>`;
+    }
+    function lawBlock(no) {
+      const a = refs().qms?.articles?.[no];
+      if (!a) return `<div class="cl-blk law"><div class="cl-bh"><span class="cl-src-tag law">QMS 準則</span><b>第 ${no} 條</b></div><div class="cl-txt muted">尚未下載準則原文（執行 tools/fetch_refs.py）</div></div>`;
+      return `<div class="cl-blk law"><div class="cl-bh"><span class="cl-src-tag law">QMS 準則</span><b>第 ${no} 條</b><span class="muted">${esc(a.chapter)}</span><a class="cl-ext" href="https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=L0030116&amp;flno=${no}" target="_blank" rel="noopener">法規原文 ↗</a></div><div class="cl-txt">${lawHtml(a.text)}</div></div>`;
+    }
+    function isoBlock(c) {
+      const en = enTitle(c);
+      return `<div class="cl-blk iso"><div class="cl-bh"><span class="cl-src-tag iso">ISO 13485:2016</span><b>${esc(c)}</b><span>${esc(zhTitle(c))}</span></div>
+        <div class="cl-txt"><p class="rd-p">${en ? `英文標題：<i>${esc(en)}</i>` : '本條在標準中沒有標題（屬上層條文的一項要求）'}</p><p class="rd-p cl-note">標準本文受 ISO 著作權保護，不在此轉載；請見 <a href="https://www.iso.org/obp/ui/en/#iso:std:iso:13485:ed-3:v1:en" target="_blank" rel="noopener">ISO 線上瀏覽平台 ↗</a> 或公司購置的正式版本。</p></div></div>`;
+    }
+    function docsBlock(key, rs) {
+      const others = [...new Set(rs.flatMap(r => r.docs || []))].filter(k => k !== key && N.get(k));
+      const na = rs.some(r => r.not_applicable);
+      return `${na ? '<div class="cl-na">品質手冊附錄A 標示本條「不適用」</div>' : ''}${others.length ? `<div class="cl-docs"><span>同條文的負責文件</span>${others.map(k => `<button class="pchip lv${N.get(k).level} cl-doc" data-key="${esc(k)}">${esc(N.get(k).code)} ${esc(nm(N.get(k)))}</button>`).join('')}</div>` : ''}`;
+    }
+    const chev = '<span class="cl-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>';
+    function items(key) {
+      const rs = rows(key).sort((a, b) => isoKey(a.clause).localeCompare(isoKey(b.clause)));
+      if (procMode === 'qms') {
+        const by = new Map();
+        for (const r of rs) for (const a of arts(r)) { if (!by.has(a)) by.set(a, []); by.get(a).push(r); }
+        const list = [...by.entries()].sort((a, b) => a[0] - b[0]);
+        return { n: list.length, html: list.map(([no, rr]) => {
+          const ch = refs().qms?.articles?.[no]?.chapter?.replace(/^第\s*\S+\s*章\s*/, '') || '';
+          return `<div class="cl-it" data-art="${no}" data-cls="${esc(rr.map(r => r.clause).join(','))}">
+            <button class="cl-h" aria-expanded="false"><b class="cl-no">第 ${no} 條</b><span class="cl-t">${esc(rr.map(r => zhTitle(r.clause)).join('、'))}<small>${esc(ch)}</small></span><span class="cl-tag">ISO ${esc(rr.map(r => r.clause).join('、'))}</span>${chev}</button>
+            <div class="cl-b"><div class="cl-bi"></div></div></div>`;
+        }).join('') };
+      }
+      return { n: rs.length, html: rs.map(r => `<div class="cl-it" data-cls="${esc(r.clause)}">
+          <button class="cl-h" aria-expanded="false"><b class="cl-no">${esc(r.clause)}</b><span class="cl-t">${esc(zhTitle(r.clause))}<small>${esc(enTitle(r.clause))}</small></span>${arts(r).length ? `<span class="cl-tag">QMS 第 ${arts(r).join('、')} 條</span>` : r.not_applicable ? '<span class="cl-tag na">不適用</span>' : ''}${chev}</button>
+          <div class="cl-b"><div class="cl-bi"></div></div></div>`).join('') };
+    }
+    function detail(key, it) {
+      const cls = it.dataset.cls.split(',');
+      const rs = cls.map(c => (G.iso_map || []).find(r => r.clause === c)).filter(Boolean);
+      if (it.dataset.art) return lawBlock(it.dataset.art) + cls.map(c => isoBlock(c) + qsBlock(c)).join('') + docsBlock(key, rs);
+      return arts(rs[0]).map(lawBlock).join('') + isoBlock(cls[0]) + qsBlock(cls[0]) + docsBlock(key, rs);
+    }
+    const title = n => procMode === 'qms' ? `對應 QMS 準則條文（${n}）` : `對應 ISO 13485:2016 條文（${n}）`;
+    function srcNote() {
+      const q = refs().qms, i = refs().iso;
+      const lines = [];
+      if (q) lines.push(`QMS：《${esc(q.name)}》${esc(q.issued || '')}發布${q.amended ? `，${esc(q.amended)}修正` : '，未曾修正'}（<a href="${esc(q.provenance?.url || '')}" target="_blank" rel="noopener">全國法規資料庫</a>，${esc((q.provenance?.checked_at || '').slice(0, 10))} 查核為最新版）`);
+      if (i) lines.push(`ISO：ISO 13485:2016 第 3 版（<a href="${esc(i.provenance?.status_url || '')}" target="_blank" rel="noopener">iso.org</a> 標示 2025 年複審確認為現行版，${esc(i.provenance?.status_checked_at || '')} 查核）`);
+      lines.push(`對照關係：品質手冊 QS─01 附錄A${G.qs_text && Object.keys(G.qs_text).length ? '；手冊內容：QS─01 同條號段落' : ''}`);
+      return `<div class="cl-foot">${lines.join('<br>')}</div>`;
+    }
+    function section(key) {
+      const { n, html } = items(key);
+      return `<h4 data-fold="對應條文" class="cl-head">⬆ ${title(n)}</h4><div class="cl-sec" data-key="${esc(key)}">
+        <div class="seg cl-mode" role="tablist"><button data-m="iso">依 ISO 13485 章節</button><button data-m="qms">依 QMS 條號</button></div>
+        <p class="cl-hint">點條文展開：QMS 準則原文、ISO 條文標題、品質手冊對應內容與同條文負責文件。</p>
+        <div class="cl-list">${html}</div>${srcNote()}</div>`;
+    }
+    function bind(body) {
+      const sec = $('.cl-sec', body); if (!sec) return;
+      $$('.cl-mode button', sec).forEach(b => { b.classList.toggle('on', b.dataset.m === procMode); b.onclick = e => { e.stopPropagation(); setProcMode(b.dataset.m); }; });
+      $('.cl-list', sec).onclick = e => {
+        const d = e.target.closest('.cl-doc'); if (d) { openDetail(d.dataset.key); return; }
+        const h = e.target.closest('.cl-h'); if (!h) return;
+        const it = h.parentElement, bi = $('.cl-bi', it);
+        if (!bi.innerHTML) bi.innerHTML = detail(sec.dataset.key, it);
+        holdFold();
+        const on = !it.classList.contains('open');
+        it.classList.toggle('open', on); h.setAttribute('aria-expanded', on);
+      };
+    }
+    // 切換 ISO／QMS 時，就地更新已開啟面板的條文段落（保留捲動位置與段落展開狀態）
+    function refresh() {
+      const sec = $('#drawerBody .cl-sec'); if (!sec) return;
+      const { n, html } = items(sec.dataset.key);
+      $('.cl-list', sec).innerHTML = html;
+      const h = sec.closest('.dsec')?.querySelector('h4');
+      const t = h && [...h.childNodes].find(x => x.nodeType === 3 && x.textContent.trim());
+      if (t) t.textContent = title(n);
+      $$('.cl-mode button', sec).forEach(b => b.classList.toggle('on', b.dataset.m === procMode));
+    }
+    return { rows, section, bind, refresh };
+  })();
+
   function readable(text) {
     let t = String(text || '');
     if (!t.includes('\n')) { // 舊資料沒有段落資訊：在條列項目前、句末後自動換行
@@ -1018,10 +1146,7 @@
     const WIDE = ['原始檔', '舊版檔案', '附錄位置', '制定單位', '審查／核准'];
     if (facts.length) parts.push(`<h4>📄 基本資料</h4><div class="facts">${facts.map(([a, b]) => `<div class="fact${WIDE.includes(a) ? ' wide' : ''}"><span>${a}</span><b>${b}</b></div>`).join('')}</div>`);
 
-    if (n.level === 2) {
-      const iso = (G.iso_map || []).filter(r => (r.docs || []).includes(key) && r.title);
-      if (iso.length) parts.push(`<h4>⬆ 對應品質手冊（ISO 13485）條文</h4><div>${iso.map(r => `<span class="chip" style="margin:2px">${esc(r.clause)} ${esc(r.title)}</span>`).join('')}</div>`);
-    }
+    if (n.level <= 2 && CL.rows(key).length) parts.push(CL.section(key));
     const ps = (PS.get(key) || []).filter(k => k !== ROOT || n.level === 2);
     if (ps.length && n.level > 1) {
       parts.push(`<h4>⬆ 上層文件</h4><div class="why">判定依據：${esc(n.parent_basis || (n.level === 2 ? '二階程序書隸屬品質手冊' : '—'))}</div><div class="rel-list">${ps.map(k => relRow(k)).join('')}</div>`);
@@ -1862,12 +1987,7 @@
   function start() {
     $$('#tabs button').forEach(b => b.onclick = () => switchView(b.dataset.view));
     $('#brandHome').onclick = e => { e.preventDefault(); switchView('guide'); };
-    $$('#procMode button').forEach(b => b.onclick = () => {
-      if (procMode === b.dataset.mode) return;
-      procMode = b.dataset.mode;
-      try { localStorage.setItem('qms.procMode', procMode); } catch (e) { /* 無痕模式 */ }
-      renderProcs();
-    });
+    $$('#procMode button').forEach(b => b.onclick = () => setProcMode(b.dataset.mode));
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetail(); });
     $('#scrim').onclick = closeDetail;
     // 內容往下捲時，頁首收合成精簡列。
