@@ -170,11 +170,14 @@
     <h2>全部文件</h2>
     <p class="lead">一階品質手冊到四階紀錄表單的完整清冊。點層級方塊篩選，點任一列看詳細說明與出處。</p>
     <div class="all-tiles" id="allTiles"></div>
+    <div class="proc-dept" id="allCats" hidden aria-label="三階分類篩選"></div>
     <div class="all-bar">
       <label class="all-q"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="allQ" type="search" placeholder="篩選編號、名稱、部門或保存期限" autocomplete="off"></label>
       <label class="all-tg"><input type="checkbox" id="allRet"><span>只看有保存期限</span></label>
       <label class="all-tg"><input type="checkbox" id="allElec"><span>只看電子表單</span></label>
-      <label class="all-sort">排序<select id="allSort"><option value="code">依層級與編號</option><option value="eff">施行日（新→舊）</option><option value="cite">被引用（多→少）</option></select></label>
+      <label class="all-tg"><input type="checkbox" id="allOver"><span>只看逾期未審視</span></label>
+      <label class="all-sort all-dept"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></svg>部門<select id="allDept" aria-label="依部門篩選"></select></label>
+      <label class="all-sort">排序<select id="allSort"><option value="code">依層級與編號</option><option value="eff">施行日（新→舊）</option><option value="cite">被引用（多→少）</option><option value="due">屆期日期（近→遠）</option></select></label>
       <span class="all-count" id="allCount"></span>
     </div>
     <div class="all-table-wrap">

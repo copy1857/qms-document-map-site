@@ -12,7 +12,7 @@
   const LV = {
     1: { short: '一階', kind: '品質手冊', q: '公司為什麼、以什麼原則做品質？' },
     2: { short: '二階', kind: '程序書', q: '這件事由誰、依什麼流程做？' },
-    3: { short: '三階', kind: '作業指導書／規範', q: '這個步驟具體要怎麼操作？' },
+    3: { short: '三階', kind: '三階文件', q: '這個步驟具體要怎麼操作？' },
     4: { short: '紀錄', kind: '紀錄表單', q: '做完之後留下什麼證明？' },
   };
   const CHAPTERS = { 4: '4 品質管理系統（文件與紀錄）', 5: '5 管理責任', 6: '6 資源管理', 7: '7 產品實現', 8: '8 量測、分析與改進', 0: '其他' };
@@ -35,6 +35,10 @@
     '名稱簡寫': '引用時省略了部分字詞（非錯誤，建議統一用完整名稱）。',
     '已刪除表單': '缺號已在修訂紀錄中記載刪除，屬正常。',
     '部門代號未定義': '三階文件編號的部門代號不在 CP─01 表2，組織圖也對應不到單位。',
+    '編號與總覽表不符': '程序書引用的三階編號不在文件總覽表，但總覽表有同名文件（編號已變更）。',
+    '總覽表未列': '程序書引用的三階文件在文件總覽表中查無編號，也沒有同名文件。',
+    '與總覽表不符': '原文封面的版次或施行日與文件總覽表不同。',
+    '逾期未審視': '文件總覽表的屆期日期已過，仍未改版或更新審視。',
   };
   const SEV_ORDER = { '重要': 0, '注意': 1, '提示': 2 };
   // 公開唯讀版（tools/publish.py 產生）：不連伺服器、不顯示一致性檢查與上傳
@@ -53,6 +57,7 @@
     G = graph;
     N.clear(); KIDS.clear(); PS.clear();
     for (const n of G.nodes) N.set(n.key, n);
+    for (const gp of G.groups || []) N.set(gp.key, gp);
     const l1 = G.nodes.filter(n => n.level === 1);
     if (l1.length === 1) ROOT = l1[0].key;
     else {
@@ -116,9 +121,11 @@
       }
       if (lv === 3) {
         const strong = nodes.filter(n => n.parent_basis === '列於相關文件').length;
-        const citers = new Set(nodes.flatMap(n => PS.get(n.key) || []));
+        const regOnly = nodes.filter(n => (PS.get(n.key) || []).some(k => N.get(k)?.group)).length;
+        const citers = new Set(nodes.flatMap(n => PS.get(n.key) || []).filter(k => N.get(k)?.level === 2));
         const wf = forms.filter(f => N.get((PS.get(f.key) || [])[0])?.level === 3).length;
-        return { up: `由 ${citers.size} 份程序書引用`, down: wf ? `附有 ${wf} 張自己的表單` : '多數直接依程序書的表單記錄', fact: `${strong} 份列在程序書「4 相關文件」，其餘 ${nodes.length - strong} 份由本文提到` };
+        return { up: `${citers.size} 份程序書引用了其中 ${nodes.length - regOnly} 份`, down: wf ? `附有 ${wf} 張自己的表單` : '多數直接依程序書的表單記錄',
+          fact: regOnly ? `另有 ${regOnly} 份登錄於文件總覽表、尚未被程序書引用（${strong} 份列在「4 相關文件」）` : `${strong} 份列在程序書「4 相關文件」，其餘 ${nodes.length - strong} 份由本文提到` };
       }
       const owners = new Set(nodes.map(n => (PS.get(n.key) || [])[0]));
       const ret = nodes.filter(n => n.retention?.retention).length;
@@ -204,11 +211,13 @@
         <div class="pi-q">${esc(LV[lv].q)}</div>
         <div class="pi-d">${esc(lvDef.desc || '')}　<span class="code muted">${esc(lvDef.code_pattern || '')}</span></div>
         <div class="pi-rel"><div><i>⬆</i>${esc(f.up)}</div><div><i>⬇</i>${esc(f.down)}</div><div><i>✦</i>${esc(f.fact)}</div></div>
+        ${lv === 3 && (G.l3_categories || []).length ? `<div class="pi-ex-t">六類</div><div class="pi-cats">${G.l3_categories.map((c, k) => `<button class="pi-cat ripple-host" style="--k:${k}" data-cat="${esc(c)}"><b>${esc(c)}</b><span>${G.nodes.filter(n => n.level === 3 && n.kind === c).length}</span></button>`).join('')}</div>` : ''}
         <div class="pi-ex-t">例如</div>
         <div class="pi-ex">${examples(lv).map((n, k) => `<button class="pi-chip ripple-host" style="--k:${k}" data-key="${esc(n.key)}"><span class="code">${esc(n.code)}</span>${esc(nm(n))}</button>`).join('')}${G.counts[lv] > 5 ? `<span class="pi-more">…等 ${G.counts[lv]} 份</span>` : ''}</div>
         <div class="pi-cta"><button class="btn primary ripple-host" data-go="list">看全部 ${G.counts[lv]} 份 →</button><button class="btn ripple-host" data-go="map">🧭 在心智圖看</button></div>
       </div>`;
       $$('.pi-chip', box).forEach(b => b.onclick = () => { stopAuto(); openDetail(b.dataset.key); });
+      $$('.pi-cat', box).forEach(b => b.onclick = () => { stopAuto(); allFilter.levels = new Set([3]); allFilter.cat = b.dataset.cat; switchView('all'); });
       $('[data-go=list]', box).onclick = () => { stopAuto(); allFilter.levels = new Set([lv]); switchView('all'); };
       $('[data-go=map]', box).onclick = () => { stopAuto(); switchView('mindmap'); setTimeout(() => $(`[data-mm="${lv <= 2 ? 'l2' : 'l3'}"]`)?.click(), 120); };
       countUp($('.pi-count .cnt', box), G.counts[lv], 700);
@@ -525,7 +534,21 @@
   }
 
   // ------------------------------------------------------------ ④ 全部文件
-  const allFilter = { levels: new Set([1, 2, 3, 4]), q: '', ret: false, elec: false, sort: 'code' };
+  const allFilter = { levels: new Set([1, 2, 3, 4]), q: '', ret: false, elec: false, over: false, sort: 'code', cat: null, dept: '' };
+  const NO_DEPT = '未對應部門';
+  // 文件所屬部門：二階看封面「制定」、三階看編號部門代號、紀錄看所屬上層文件
+  function deptOf(n) {
+    if (n.dept) return n.dept;
+    if (n.level === 4) { const o = N.get((PS.get(n.key) || [])[0]); if (o?.dept) return o.dept; }
+    return NO_DEPT;
+  }
+  // 部門排序：依組織架構圖順序，其餘接在後面
+  function deptOrder() {
+    const units = (G.organization?.units || []).filter(u => u.docs?.length || u.wis?.length || u.dept_code);
+    const names = [];
+    for (const u of units) for (const d of [...(u.doc_dept || []), u.name]) if (!names.includes(d)) names.push(d);
+    return names;
+  }
   function renderAll() {
     const total = G.nodes.length;
     $('#allTiles').innerHTML = [1, 2, 3, 4].map((l, i) => `<button class="at lv${l} ${allFilter.levels.has(l) ? 'on' : ''}" data-lv="${l}" style="--d:${i * 60}ms" aria-pressed="${allFilter.levels.has(l)}">
@@ -544,27 +567,50 @@
       }
       renderAll();
     });
+    // 三階六類篩選列（只在三階被選取時出現）
+    const cats = G.l3_categories || [];
+    const showCats = allFilter.levels.has(3) && cats.length;
+    if (!showCats) allFilter.cat = null;
+    $('#allCats').innerHTML = showCats ? `<span class="pd-l">三階分類</span>` + [[null, '全部', G.nodes.filter(n => n.level === 3).length], ...cats.map(c => [c, c, G.nodes.filter(n => n.level === 3 && n.kind === c).length])]
+      .map(([v, l, c]) => `<button class="pd ripple-host ${allFilter.cat === v ? 'on' : ''}" data-cat="${esc(v || '')}">${esc(l)} <b>${c}</b></button>`).join('') : '';
+    $('#allCats').hidden = !showCats;
+    $$('#allCats .pd').forEach(b => b.onclick = () => { allFilter.cat = b.dataset.cat || null; renderAll(); });
     const qi = $('#allQ');
     if (qi.value !== allFilter.q) qi.value = allFilter.q;
     qi.oninput = () => { allFilter.q = qi.value; fillAll(); };
     $('#allRet').checked = allFilter.ret; $('#allRet').onchange = e => { allFilter.ret = e.target.checked; fillAll(); };
     $('#allElec').checked = allFilter.elec; $('#allElec').onchange = e => { allFilter.elec = e.target.checked; fillAll(); };
+    $('#allOver').checked = allFilter.over; $('#allOver').onchange = e => { allFilter.over = e.target.checked; fillAll(); };
     $('#allSort').value = allFilter.sort; $('#allSort').onchange = e => { allFilter.sort = e.target.value; fillAll(); };
     fillAll();
   }
   function fillAll() {
     const q = allFilter.q.trim().toLowerCase(), qc = normCode(q);
-    let rows = G.nodes.filter(n => allFilter.levels.has(n.level)
-      && (!q || normCode(n.code).includes(qc) || (n.name || '').toLowerCase().includes(q) || (n.dept || '').includes(q) || (n.retention?.retention || '').includes(q))
-      && (!allFilter.ret || n.retention?.retention) && (!allFilter.elec || n.electronic));
+    // 除了部門以外的條件
+    const base = G.nodes.filter(n => allFilter.levels.has(n.level)
+      && (!q || normCode(n.code).includes(qc) || (n.name || '').toLowerCase().includes(q) || deptOf(n).includes(q) || (n.retention?.retention || '').includes(q))
+      && (!allFilter.ret || n.retention?.retention) && (!allFilter.elec || n.electronic) && (!allFilter.over || n.register?.overdue)
+      && (!allFilter.cat || (n.level === 3 && n.kind === allFilter.cat)));
+    // 部門選單：數量依目前其他篩選條件即時計算；勾選逾期時顯示各部門逾期數
+    const cnt = {}; for (const n of base) { const d = deptOf(n); cnt[d] = (cnt[d] || 0) + 1; }
+    const order = [...deptOrder().filter(d => cnt[d]), ...Object.keys(cnt).filter(d => !deptOrder().includes(d) && d !== NO_DEPT).sort(), ...(cnt[NO_DEPT] ? [NO_DEPT] : [])];
+    if (allFilter.dept && !order.includes(allFilter.dept)) order.push(allFilter.dept);
+    const sel = $('#allDept');
+    const label = d => allFilter.over ? `${d}（逾期 ${cnt[d] || 0}）` : `${d}（${cnt[d] || 0}）`;
+    sel.innerHTML = `<option value="">全部部門（${base.length}）</option>` + order.map(d => `<option value="${esc(d)}">${esc(label(d))}</option>`).join('');
+    sel.value = allFilter.dept;
+    sel.classList.toggle('on', !!allFilter.dept);
+    sel.onchange = () => { allFilter.dept = sel.value; fillAll(); };
+    let rows = allFilter.dept ? base.filter(n => deptOf(n) === allFilter.dept) : base;
     if (allFilter.sort === 'eff') rows = [...rows].sort((a, b) => (b.effective || b.effective_ym || '').localeCompare(a.effective || a.effective_ym || ''));
     if (allFilter.sort === 'cite') rows = [...rows].sort((a, b) => (b.cited_by || []).length - (a.cited_by || []).length);
+    if (allFilter.sort === 'due') rows = [...rows].filter(n => n.register?.review_due).sort((a, b) => a.register.review_due.localeCompare(b.register.review_due));
     const maxCite = Math.max(1, ...G.nodes.map(n => (n.cited_by || []).length));
     $('#allCount').innerHTML = `顯示 <b>${rows.length}</b> / ${G.nodes.length} 筆`;
     $('#allTable tbody').innerHTML = rows.slice(0, 800).map((n, r) => {
       const p = (PS.get(n.key) || []).map(k => N.get(k)).filter(Boolean);
       const st = recent.added.has(n.key) ? ' is-added' : recent.changed.has(n.key) ? ' is-changed' : '';
-      const sub = [n.level === 3 ? n.kind : null, n.dept, n.electronic ? '電子表單' : null, n.appendix_label ? `${n.in_appendix_of} ${n.appendix_label}` : null, n.status !== 'file' && n.level <= 2 ? '未收錄原文' : null].filter(Boolean);
+      const sub = [n.level === 3 ? n.kind : null, n.register?.overdue ? `屆期 ${n.register.review_due}（已逾期）` : null, n.dept, n.electronic ? '電子表單' : null, n.appendix_label ? `${n.in_appendix_of} ${n.appendix_label}` : null, n.status !== 'file' && n.level <= 2 ? '未收錄原文' : null].filter(Boolean);
       const c = (n.cited_by || []).length;
       return `<tr data-key="${esc(n.key)}" class="lv${n.level}${st}" style="--r:${Math.min(r, 30)}">
         <td>${lvTag(n.level)}</td>
@@ -614,6 +660,10 @@
     '保存期限未列': c => `${c} 不在保存期限表中`,
     '保存期限表多列': c => `${c} 不在附錄清單中`,
     '部門代號未定義': () => '三階文件使用了未定義的部門代號',
+    '編號與總覽表不符': (c, t) => `${c} 已在文件總覽表改編為 ${t}`,
+    '總覽表未列': c => `${c} 不在文件總覽表中`,
+    '與總覽表不符': c => `${c} 的版次或施行日與文件總覽表不同`,
+    '逾期未審視': c => `${c} 已超過屆期日期`,
   };
   const ISSUE_FIX = {
     '編號重複使用': '為新表單另編從未使用過的編號；若確需沿用，於修訂紀錄說明理由並經核准。',
@@ -634,6 +684,10 @@
     '保存期限未列': '於「表單／紀錄之核准權限與保存期限」表補列核准權限與保存期限。',
     '保存期限表多列': '確認表單是否仍使用：仍使用則補列附錄，已停用則自保存期限表移除。',
     '部門代號未定義': '改編為現行部門代號，或於 CP─01 表2 增列此代號並說明所屬單位。',
+    '編號與總覽表不符': '引用端程序書下次改版時，改為總覽表中的現行編號。',
+    '總覽表未列': '確認文件是否已廢止：已廢止則修訂引用端程序書；仍使用則於文件總覽表補登錄。',
+    '與總覽表不符': '以核准發行的版本為準，更正文件總覽表或重新放入最新原文。',
+    '逾期未審視': '依《文件管制程序》於屆期前完成審視：需修訂則提出改版，不需修訂則更新審視日期。',
   };
   const SEV_ICON = {
     '重要': '<path d="M12 3 2 21h20z"/><path d="M12 9v5M12 17.5v.01"/>',
@@ -891,7 +945,7 @@
     d.setAttribute('aria-hidden', 'false');
     const chain = chainOf(key);
     $('#drawerHead').innerHTML = `<div class="row1">${lvTag(n.level)}<span class="muted" style="font-size:13px">${esc(n.kind || LV[n.level].kind)}</span>
-        ${n.status !== 'file' && n.level <= 3 ? '<span class="chip" style="font-size:12px">未收錄原文，僅由引用得知</span>' : ''}
+        ${n.group ? '' : n.status === 'register' ? '<span class="chip ok-chip" style="font-size:12px">已登錄文件總覽表・原文未收錄</span>' : n.status !== 'file' && n.level <= 3 ? '<span class="chip" style="font-size:12px">未收錄原文，僅由引用得知</span>' : ''}
         <button class="close" id="drawerClose" aria-label="關閉">×</button></div>
       <h2><span class="code">${esc(n.code)}</span>　${esc(nm(n))}</h2>${n.name_en ? `<div class="en">${esc(n.name_en)}</div>` : ''}
       <div class="crumbs">${chain.map((k, i) => `${i ? '›' : ''}<button class="tag lv${N.get(k).level}" data-key="${esc(k)}">${esc(N.get(k).code)}</button>`).join('')}</div>`;
@@ -901,8 +955,10 @@
     const deptStat = n.dept ? [['制定', n.dept, deptUnit?.id]] : [];
     headStats(n.level === 4
       ? [['保存期限', n.retention?.retention], ['施行', n.effective_ym], ['附錄', n.appendix_label], ['被引用', `${(n.cited_by || []).length} 份`]]
+      : n.group
+        ? [['份數', `${kidsOf(key, 3).length} 份`]]
       : n.level === 3
-        ? [['類型', n.kind], ...deptStat, ['上層', `${(PS.get(key) || []).length} 份`], ['被引用', `${(n.cited_by || []).length} 份`], ['表單', kidsOf(key, 4).length ? `${kidsOf(key, 4).length} 種` : null]]
+        ? [['類型', n.kind], ['版次', n.version && `V${n.version}`], ...deptStat, ['屆期', n.register?.review_due], ['被引用', `${(n.cited_by || []).length} 份`], ['表單', kidsOf(key, 4).length ? `${kidsOf(key, 4).length} 種` : null]]
         : [['版次', n.version && `V${n.version}`], ['施行', n.effective], ...deptStat, n.level === 1 ? ['程序書', `${kidsOf(key, 2).length} 份`] : ['三階', `${kidsOf(key, 3).length} 份`], n.level === 2 ? ['紀錄', `${kidsOf(key, 4).length} 種`] : ['頁數', n.pages && `${n.pages} 頁`]]);
 
     const parts = [];
@@ -910,7 +966,9 @@
       1: '這是整個品質系統的最上層，所有程序書都依它而來。',
       2: (() => { const k3 = kidsOf(key, 3).map(k => N.get(k)); const strong = k3.filter(x => x.parent_basis === '列於相關文件').length;
         return `這是一份程序書，底下有 <b>${kidsOf(key, 4).length} 種紀錄表單</b>，以及 ${k3.length} 份三階文件${k3.length ? `（${strong} 份列在「4 相關文件」，${k3.length - strong} 份只在本文中提到，例如訓練教材或參考）` : ''}。`; })(),
-      3: `這是三階文件（${esc(n.kind || '')}），用來說明具體怎麼做。${(PS.get(key) || []).length > 1 ? `它被 ${(PS.get(key) || []).length} 份程序書共同使用。` : ''}`,
+      3: n.group
+        ? `文件總覽表中「${esc(n.kind)}」類、目前沒有任何程序書引用的三階文件，共 ${kidsOf(key, 3).length} 份。`
+        : `這是三階文件（${esc(n.kind || '')}），用來說明具體怎麼做。${(PS.get(key) || []).filter(k => N.get(k)?.level === 2).length > 1 ? `它被 ${(PS.get(key) || []).length} 份程序書共同使用。` : ''}${(PS.get(key) || []).some(k => N.get(k)?.group) ? '目前沒有程序書引用它，依文件總覽表分類歸組。' : ''}`,
       4: `這是一張紀錄表單，屬於 <b class="code">${esc(codeOf((PS.get(key) || [])[0] || ''))}</b>${N.get((PS.get(key) || [])[0]) ? ` ${esc(nm(N.get(PS.get(key)[0])))}` : ''}。執行工作後填寫留存，是稽核時的證據。`,
     }[n.level];
     parts.push(`<div class="plain">${plainLine}</div>`);
@@ -923,6 +981,14 @@
     if (n.appendix_label) facts.push(['附錄位置', `${esc(n.in_appendix_of)} ${esc(n.appendix_label)}`]);
     if (n.retention) facts.push(['審查／核准', `${esc(n.retention.review || '—')} ／ ${esc(n.retention.approve || '—')}`], ['保存期限', `<b>${esc(n.retention.retention || '—')}</b>`]);
     if (n.electronic) facts.push(['形式', '電子表單']);
+    if (n.register) {
+      const r = n.register;
+      facts.push(['總覽表分類', esc(r.sheet)]);
+      if (r.review_due) facts.push(['屆期日期', `${esc(r.review_due)}${r.overdue ? ' <span class="od-badge">已逾期</span>' : ''}`]);
+      if (r.review_cycle) facts.push(['審視週期', `${r.review_cycle} 年`]);
+      if (n.level === 3 && r.effective && r.effective !== n.effective) facts.push(['總覽表施行', esc(r.effective)]);
+      if (r.pending?.length) facts.push(['待施行版本', r.pending.map(x => `V${esc(x.version || '—')}（${esc(x.effective || '—')} 施行）`).join('、')]);
+    }
     if (n.pages) facts.push(['頁數', `${n.pages} 頁`]);
     if (n.file) facts.push(['原始檔', `<a href="../${encodeURI(n.file)}" target="_blank" rel="noopener">${esc(n.file.split('/').pop())}</a> <span class="muted code">${esc(n.sha256_16 || '')}</span>`]);
     if (n.superseded_files?.length) facts.push(['舊版檔案', n.superseded_files.map(f => `${esc(f.file)}（V${esc(f.version)}）`).join('、')]);
@@ -1183,7 +1249,8 @@
         if (n.level === 2) rows.push(`三階 ${kidsOf(key, 3).length} · 紀錄 ${kidsOf(key, 4).length}`);
       } else if (n.level === 3) {
         rows.push([n.kind, n.parent_basis && `依據：${n.parent_basis}`].filter(Boolean).join(' · '));
-        rows.push(`被 ${(n.cited_by || []).length} 份文件引用${kidsOf(key, 4).length ? ` · 表單 ${kidsOf(key, 4).length}` : ''}`);
+        rows.push(n.group ? `${kidsOf(key, 3).length} 份文件` : `被 ${(n.cited_by || []).length} 份文件引用${kidsOf(key, 4).length ? ` · 表單 ${kidsOf(key, 4).length}` : ''}`);
+        if (n.register?.review_due) rows.push(`屆期 ${esc(n.register.review_due)}${n.register.overdue ? ' <span class="od-badge">已逾期</span>' : ''}`);
       } else {
         rows.push([n.retention?.retention && `保存 ${n.retention.retention}`, n.electronic && '電子表單', n.effective_ym && `${n.effective_ym} 施行`].filter(Boolean).join(' · ') || '紀錄表單');
         if (n.appendix_label) rows.push(`${n.in_appendix_of} ${n.appendix_label}`);
@@ -1570,7 +1637,7 @@
       const show = u.wis.slice(0, 12);
       parts.push(`<h4>📗 三階文件（部門代號 ${esc(u.dept_code)}，${u.wis.length} 份）</h4><div class="rel-list" id="orgWis">${show.map(k => relRow(k)).join('')}</div>${u.wis.length > 12 ? `<button class="btn small ripple-host" id="orgWisMore" style="margin-top:6px">顯示全部 ${u.wis.length} 份</button>` : ''}`);
     }
-    if (u.docs.length || u.wis.length) parts.push(`<div style="margin-top:16px"><button class="btn primary ripple-host" id="orgToMap">🧭 在心智圖看此單位的文件（${u.docs.length + u.wis.length}）</button></div>`);
+    if (u.docs.length || u.wis.length) parts.push(`<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary ripple-host" id="orgToMap">🧭 在心智圖看此單位的文件（${u.docs.length + u.wis.length}）</button><button class="btn ripple-host" id="orgToList">📋 在全部文件列出</button></div>`);
     parts.push(`<div class="why" style="margin-top:16px">組織圖來源：CP─28 ${esc(src.clause)} ${esc(src.figure)}${pdf(src.page)}（${esc(src.transcribed_by)}）</div>`);
     $('#drawerBody').innerHTML = parts.join('');
     $('#drawerBody').scrollTop = 0; $('#drawer').classList.remove('scrolled');
@@ -1578,6 +1645,12 @@
     $$('#drawerBody .rel[data-key]').forEach(r => r.onclick = () => openDetail(r.dataset.key));
     enhanceDrawer();
     if ($('#orgToMap')) $('#orgToMap').onclick = () => ORG.goMap(id);
+    if ($('#orgToList')) $('#orgToList').onclick = () => {
+      closeDetail();
+      allFilter.levels = new Set([1, 2, 3, 4]); allFilter.cat = null;
+      allFilter.dept = (u.doc_dept || [])[0] || u.name;
+      switchView('all');
+    };
     const more = $('#orgWisMore');
     if (more) more.onclick = () => { $('#orgWis').innerHTML = u.wis.map(k => relRow(k)).join(''); $$('#orgWis .rel').forEach(r => r.onclick = () => openDetail(r.dataset.key)); more.remove(); };
   }

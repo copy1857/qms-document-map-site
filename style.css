@@ -1126,3 +1126,22 @@ table.list.all th:nth-child(6), table.list.all td:nth-child(6) { text-align: cen
 
 /* 公開唯讀版 */
 header.top .live.pub .dot { background: #7fe3ff; box-shadow: 0 0 6px #7fe3ff; }
+
+/* 文件總覽表 */
+.od-badge { display: inline-block; margin-left: 6px; padding: 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; color: #fff; background: #d98a0b; }
+.drawer-head .ok-chip { background: rgba(63, 224, 176, .18); border-color: rgba(63, 224, 176, .5); color: #c8fbe8; }
+
+/* 三階六類 */
+.pi-cats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 4px; }
+.pi-cat { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 6px 10px; border-radius: 10px; cursor: pointer; background: var(--panel);
+  border: 1px solid color-mix(in srgb, var(--c) 35%, var(--line)); animation: piIn .45s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(80ms + var(--k) * 45ms); transition: transform .2s, border-color .2s; }
+.pi-cat:hover { transform: translateY(-2px); border-color: var(--c); }
+.pi-cat b { font-size: 13px; color: var(--ink); }
+.pi-cat span { font-size: 15px; font-weight: 800; color: var(--c); font-variant-numeric: tabular-nums; }
+#allCats { margin-top: -4px; }
+
+/* 全部文件：部門選單 */
+.all-dept svg { color: var(--cgm); }
+.all-dept select { min-width: 190px; font-weight: 600; }
+.all-dept select.on { background: linear-gradient(135deg, #1a63b3, var(--cgm)); color: #fff; border-color: transparent; box-shadow: 0 4px 10px rgba(42, 127, 207, .35); }
+.all-dept select.on option { color: var(--ink); background: var(--panel); }
