@@ -809,9 +809,26 @@
       const docs = r.not_applicable ? '<span class="muted">暫不適用</span>' : (r.docs || []).map(k => {
         const n = N.get(k); return n ? `<button class="chip lv${n.level} dchip ripple-host" data-key="${esc(k)}"><span class="code">${esc(n.code)}</span> ${esc(nm(n))}</button>` : '';
       }).join('');
-      return `<tr class="${top ? 'top' : ''}"><td><span class="code">${esc(r.clause)}</span> ${esc(r.title)}</td><td>${esc(r.qms)}</td><td>${docs}</td></tr>`;
+      if (top) return `<tr class="top"><td><span class="code">${esc(r.clause)}</span> ${esc(r.title)}</td><td>${esc(r.qms)}</td><td>${docs}</td></tr>`;
+      return `<tr class="iso-row" data-c="${esc(r.clause)}" tabindex="0" aria-expanded="false"><td><span class="iso-chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></svg></span><span class="code">${esc(r.clause)}</span> ${esc(r.title || (G.refs?.iso?.titles?.[r.clause] ?? ''))}</td><td>${esc(r.qms)}</td><td>${docs}</td></tr>`;
     }).join('') || '<tr><td colspan="3" class="empty">尚未解析到品質手冊附錄A</td></tr>';
     $$('#isoTable .dchip').forEach(b => b.onclick = e => { e.stopPropagation(); openDetail(b.dataset.key); });
+    // 點條文列展開：ISO 條號與英文標題、QMS 準則原文、品質手冊同條號內容
+    const toggle = tr => {
+      let det = tr.nextElementSibling?.classList.contains('iso-det') ? tr.nextElementSibling : null;
+      if (!det) {
+        const r = G.iso_map.find(x => x.clause === tr.dataset.c);
+        const body = CL.isoBlock(r.clause) + CL.arts(r).map(CL.lawBlock).join('') + (CL.qsBlock(r.clause) || '<div class="cl-blk qs"><div class="cl-bh"><span class="cl-src-tag qs">品質手冊</span></div><div class="cl-txt muted">品質手冊此條只有標題，內容寫在下一層條文</div></div>');
+        tr.insertAdjacentHTML('afterend', `<tr class="iso-det"><td colspan="3"><div class="cl-b"><div class="cl-bi">${body}</div></div></td></tr>`);
+        det = tr.nextElementSibling; void det.offsetWidth;
+      }
+      const on = !tr.classList.contains('open');
+      tr.classList.toggle('open', on); det.classList.toggle('open', on); tr.setAttribute('aria-expanded', on);
+    };
+    $$('#isoTable tr.iso-row').forEach(tr => {
+      tr.onclick = e => { if (!e.target.closest('.dchip, a')) toggle(tr); };
+      tr.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(tr); } };
+    });
   }
 
   // ------------------------------------------------------------ ⑦ 異動紀錄
@@ -1054,7 +1071,7 @@
       $('.cl-hint', sec).textContent = hint();
       $('.cl-foot', sec).outerHTML = srcNote();
     }
-    return { rows, section, bind, refresh };
+    return { rows, section, bind, refresh, isoBlock, lawBlock, qsBlock, arts };
   })();
 
   function readable(text) {

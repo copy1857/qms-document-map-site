@@ -1307,3 +1307,20 @@ nav.tabs button { flex: none; }
   :root:not([data-theme="light"]) .cl-blk { border-color: #1d3b66; }
   :root:not([data-theme="light"]) .cl-bh b { color: #cfe6ff; }
 }
+
+/* ISO 對照：點條文列展開細項（沿用詳細面板的條文區塊樣式） */
+#isoTable tr.iso-row { cursor: pointer; }
+#isoTable tr.iso-row:focus-visible { outline: 2px solid var(--cgm); outline-offset: -2px; }
+#isoTable tr.iso-row.open { background: color-mix(in srgb, var(--cgm) 8%, var(--panel)); }
+.iso-chev { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-right: 6px; vertical-align: -4px; border-radius: 50%; background: #eef5fc; color: var(--cgm); transition: transform .3s cubic-bezier(.2, .8, .2, 1), background .2s; }
+.iso-chev svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+#isoTable tr.iso-row.open .iso-chev { transform: rotate(90deg); background: var(--cgm); color: #fff; }
+#isoTable tr.iso-det > td { padding: 0 12px; border-bottom: 0; background: color-mix(in srgb, var(--cgm) 3%, var(--panel)); }
+#isoTable tr.iso-det.open > td { padding: 2px 12px 14px; border-bottom: 1px solid var(--line); }
+#isoTable tr.iso-det.open .cl-b { grid-template-rows: 1fr; }
+#isoTable tr.iso-det:hover { background: none; }
+#isoTable tr.iso-det { cursor: default; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .iso-chev { background: #0f2544; color: #cfe6ff; } }
+/* 分頁列可橫向滑動但不顯示捲軸 */
+nav.tabs { scrollbar-width: none; }
+nav.tabs::-webkit-scrollbar { display: none; }
